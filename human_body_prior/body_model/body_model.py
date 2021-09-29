@@ -41,6 +41,7 @@ class BodyModel(nn.Module):
                  num_dmpls=None, path_dmpl=None,
                  num_expressions=10,
                  use_posedirs=True,
+                 model_type=None,
                  dtype=torch.float32):
 
         super(BodyModel, self).__init__()
@@ -244,8 +245,7 @@ class BodyModel(nn.Module):
         verts, joints = lbs(betas=shape_components, pose=full_pose, v_template=v_template,
                             shapedirs=shapedirs, posedirs=self.posedirs,
                             J_regressor=self.J_regressor, parents=self.kintree_table[0].long(),
-                            lbs_weights=self.weights,
-                            dtype=self.dtype)
+                            lbs_weights=self.weights)
 
         Jtr = joints + trans.unsqueeze(dim=1)
         verts = verts + trans.unsqueeze(dim=1)
@@ -389,13 +389,11 @@ class BodyModelWithPoser(BodyModel):
                     pose = self.poser_body_pt.decode(poZ_body, output_type='aa').view(self.batch_size, -1)
                     if pose.shape[1] > 63:
                         pose_body = pose[:,3:66]
-                        root_orient = pose[:,:3]
+                        self.root_orient.data[:] = pose[:,:2]
                     else:
                         pose_body = pose[:,:63]
-                        root_orient = None
 
                     self.pose_body.data[:] = pose_body
-                    self.root_orient.data[:] = root_orient
 
             if self.use_hands and self.model_type in ['smplh', 'smplx']:
                 with torch.no_grad():
@@ -403,9 +401,9 @@ class BodyModelWithPoser(BodyModel):
                     self.poZ_handL.data[:] = self.poZ_handL.new(np.random.randn(*list(self.poZ_handL.shape))).detach()
                     self.poZ_handR.data[:] = self.poZ_handR.new(np.random.randn(*list(self.poZ_handR.shape))).detach()
 
-                        pose_handL = self.poser_handL_pt.decode(self.poZ_handL, output_type='aa').view(self.batch_size, -1)
-                        pose_handR = self.poser_handR_pt.decode(self.poZ_handR, output_type='aa').view(self.batch_size, -1)
-                        self.pose_hand.data[:] = torch.cat([pose_handL, pose_handR], dim=1)
+                    pose_handL = self.poser_handL_pt.decode(self.poZ_handL, output_type='aa').view(self.batch_size, -1)
+                    pose_handR = self.poser_handR_pt.decode(self.poZ_handR, output_type='aa').view(self.batch_size, -1)
+                    self.pose_hand.data[:] = torch.cat([pose_handL, pose_handR], dim=1)
 
     def untagnle_interpenetrations(self, max_collisions=8, sigma=1e-3):
         bmip = BodyInterpenetration(self, max_collisions=max_collisions, sigma=sigma)
