@@ -106,3 +106,4 @@ human_body_prior/expriments
 .idea/
 human_body_prior/evaluate
 human_body_prior/cluster
+data/
