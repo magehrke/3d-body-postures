@@ -1,28 +1,18 @@
-from human_body_prior.body_model.body_model import BodyModelWithPoser
-import trimesh
-from human_body_prior.tools.omni_tools import copy2cpu as c2c
 import os
-from human_body_prior.tools.omni_tools import colors, makepath
-from human_body_prior.body_model.body_model import BodyModel
-from human_body_prior.mesh.mesh_viewer import MeshViewer
-from human_body_prior.tools.visualization_tools import imagearray2file, smpl_params2ply
-from human_body_prior.tools.omni_tools import id_generator, makepath
-import numpy as np
 import cv2
 import torch
-import matplotlib.pyplot as plt
+import trimesh
+import numpy as np
 from tqdm import tqdm
-
-import torch.nn as nn
-import scipy.spatial.distance as sd
-import scipy.linalg as sl
-from smplx.lbs import lbs
-
-from human_body_prior.tools.omni_tools import apply_mesh_tranfsormations_
-
-#from SPIN.utils.geometry import perspective_projection
-
 import imageio as iio
+import scipy.linalg as sl
+from human_body_prior.body_model.body_model import BodyModelWithPoser
+from human_body_prior.mesh.mesh_viewer import MeshViewer
+from human_body_prior.tools.omni_tools import copy2cpu as c2c
+from human_body_prior.tools.omni_tools import id_generator, makepath
+from human_body_prior.tools.omni_tools import apply_mesh_tranfsormations_
+import generate_utils as g_utils
+
 
 def rand_ndim_onb(ndim):
     '''
@@ -78,175 +68,171 @@ def perspective_projection(points, rotation, translation,
 
     return projected_points[:, :, :-1]
 
-smpl_exp_dir = '../data/vposer_v1_0/'
 
-# directory for the trained model along with the model code. obtain from https://smpl-x.is.tue.mpg.de/downloads
-# D:\smpl\human_body_prior-master
+class GenerateVposerStimsViewpoint:
+    def __init__(self, smpl_exp_dir: str, bm_path: str, out_dir: str, device: torch.device):
+        self.smpl_exp_dir = smpl_exp_dir
+        self. bm_path = bm_path
+        self.out_dir = out_dir
+        self.device = device
 
-bm_path = '../data/models/smplx/SMPLX_MALE.npz'  # obtain from https://smpl-x.is.tue.mpg.de/downloads
-# bm_path = 'D:\smpl\models\smpl\SMPL.pkl'
+        self.bm = BodyModelWithPoser(bm_path=bm_path, batch_size=1, model_type='smplx', poser_type='vposer',
+                                     smpl_exp_dir=smpl_exp_dir, mano_exp_dir=None).to('cuda')
+        self.bm2 = BodyModelWithPoser(bm_path=bm_path, batch_size=1, model_type='smplx', poser_type='vposer',
+                                      smpl_exp_dir=smpl_exp_dir).to('cuda')
+        self.bm3 = BodyModelWithPoser(bm_path=bm_path, batch_size=1, model_type='smplx', poser_type='vposer',
+                                      smpl_exp_dir=smpl_exp_dir).to('cuda')
 
-device = torch.device('cuda')
+        self.num_interpol = 18
+        self.view_angles = np.linspace(0, 2, num=self.num_interpol)
+        self.imw, self.imh = 400, 400
+        self.fraction = 15
 
-bm = BodyModelWithPoser(bm_path=bm_path, batch_size=1, model_type='smplx', poser_type='vposer',
-                        smpl_exp_dir=smpl_exp_dir, mano_exp_dir=None).to('cuda')
+        # TODO
+        self.poz_sel = np.arange(32)
+        # TODO
+        self.nrand = 6
 
-# vertices = c2c(bm.forward().v)[0]
-# faces = c2c(bm.f)
-# mesh = trimesh.base.Trimesh(vertices, faces).show()
+        # Viewpoint
+        self.num_vp = 3
+        self.vp = [-45, 0, 45]
+        self.scale = [8, 8, 32, 32, 96, 96]
 
-bm2 = BodyModelWithPoser(bm_path=bm_path, batch_size=1, model_type='smplx', poser_type='vposer',
-                         smpl_exp_dir=smpl_exp_dir).to('cuda')
+        # TODO
+        self.nexp = self.poz_sel.shape[0] * self.nrand
 
-# vertices = c2c(bm2.forward().v)[0]
-# faces = c2c(bm2.f)
-# mesh = trimesh.base.Trimesh(vertices, faces).show()
+        self.t3mat = np.zeros((self.nexp, self.num_vp, self.num_interpol, 32))
+        self.kp2dmat = np.zeros((self.nexp, self.num_vp, self.num_interpol, 55, 2))
+        self.kp3dmat = np.zeros((self.nexp, self.num_vp, self.num_interpol, 55, 3))
+        self.poseaamat = np.zeros((self.nexp, self.num_vp, self.num_interpol, 63))
 
-bm3 = BodyModelWithPoser(bm_path=bm_path, batch_size=1, model_type='smplx', poser_type='vposer',
-                         smpl_exp_dir=smpl_exp_dir).to('cuda')
+        self.posemat = np.zeros((self.nexp, 32))
+        self.mat2d = np.zeros((self.nexp, self.num_vp, 55))
+        self.viewpointmat = np.zeros((self.nexp, self.num_vp))
 
-# bm.poZ_body.data[:]=bm.poZ_body.new(np.zeros(bm.poZ_body.shape)).detach()
-# bm2.poZ_body.data[:]=bm2.poZ_body.new(np.zeros(bm.poZ_body.shape)).detach()
+        for i in range(self.nrand):
+            X = rand_ndim_onb(self.poz_sel.shape[0])
+            self.posemat[i * self.poz_sel.shape[0]:(i + 1) * self.poz_sel.shape[0], self.poz_sel] \
+                = X.transpose() * self.scale[i]
 
-# bm3.pose_body.data[:]=bm.poser_body_pt.decode(bm.poZ_body, output_type='aa').view(bm.batch_size, -1)
-# bm3.pose_body.data[:]=bm2.poser_body_pt.decode(bm2.poZ_body, output_type='aa').view(bm2.batch_size, -1)
+        # Save activations of decoding layers
+        # Will be overwritten everytime forward() or decode() is again
+        self.activation = {}
+        self.bm3.poser_body_pt.bodyprior_dec_fc1.register_forward_hook(self.activation_hook('bodyprior_dec_fc1'))
+        self.bm3.poser_body_pt.bodyprior_dec_fc2.register_forward_hook(self.activation_hook('bodyprior_dec_fc2'))
+        self.bm3.poser_body_pt.bodyprior_dec_out.register_forward_hook(self.activation_hook('bodyprior_dec_out'))
 
-num_interp = 18
-# view_angles = [0, 90]
-view_angles = np.linspace(0, 2, num=num_interp)
-imw, imh = 400, 400
-fraction = 15
-#magification = 2
+    def activation_hook(self, name):
+        def hook(model, input, output):
+            self.activation[name] = output.detach()
+        return hook
 
-#poz_sel = np.asarray([6, 8, 9, 10, 12, 13, 14, 17, 18, 20, 22, 23, 26, 27, 29, 30, 31])
-poz_sel = np.arange(32)
-poz_mul = np.zeros(32)
-#poz_mul[poz_sel] = poz_mul[poz_sel] * magification
-poz_mul[poz_sel] = poz_mul[poz_sel] + 1
-#poz_mul = torch.tensor(poz_mul, dtype=torch.float, requires_grad=False).to('cuda')
+    def create_poses(self):
+        for i in tqdm(range(0, self.nexp)):
+            self.bm2.randomize_pose()
 
-#nexp = 100
-#nrand = 11
-nrand = 6
+            t1 = self.bm.poZ_body.new(self.posemat[i, :]).detach()
+            t2 = self.bm2.poZ_body.data
 
-num_vp = 3 #-45 0 45
-vp = [-45, 0, 45]
-scale = [8, 8, 32, 32, 96, 96]
-# since d is lower for d=17 selection, the average max values will be higher. thus scale down to have approx the same max values for d=32 and d=17
-#scale = np.asarray([8, 8, 8, 32, 32, 32, 32, 96, 96, 96, 96])*0.74
+            mv = MeshViewer(width=self.imw, height=self.imh, use_offscreen=True)
 
-nexp = poz_sel.shape[0]*nrand
+            for vp_id in range(3):
+                images = np.zeros([self.num_interpol, self.imh, self.imw, 3])
+                self.viewpointmat[i, vp_id] = self.vp[vp_id]
+                for ipol_id in range(0, self.num_interpol):
+                    alpha = 1 - (ipol_id / (self.num_interpol * self.fraction))
+                    t3 = (alpha * t1 + (1 - alpha) * t2)
+                    self.t3mat[i, vp_id, ipol_id, :] = t3.detach().cpu().numpy()
 
-t3mat = np.zeros((nexp, num_vp, num_interp, 32))
-kp2dmat = np.zeros((nexp, num_vp, num_interp, 55, 2))
-kp3dmat = np.zeros((nexp, num_vp, num_interp, 55, 3))
-poseaamat = np.zeros((nexp, num_vp, num_interp, 63))
+                    self.bm3.poZ_body.data[:] = t3
 
-posemat = np.zeros((nexp, 32))
-mat2d = np.zeros((nexp, num_vp, 55))
-viewpointmat = np.zeros((nexp, num_vp))
-#viewpointmat[0] = 0
+                    self.bm3.pose_body.data[:] = self.bm3.poser_body_pt.decode(self.bm3.poZ_body, output_type='aa').view(
+                        self.bm3.batch_size, -1)
 
-#outdir = makepath(os.path.join(smpl_exp_dir, 'evaluations', fn))
-out_dir = makepath(os.path.join(smpl_exp_dir, 'evaluations', 'blapose_stims_vp_p17'))
+                    self.poseaamat[i, vp_id, ipol_id, :] = torch.squeeze(self.bm3.pose_body).detach().cpu().numpy()
 
-for i in range(nrand):
-    X = rand_ndim_onb(poz_sel.shape[0])
-    #posemat[i*poz_sel.shape[0]:(i+1)*poz_sel.shape[0], poz_sel] = X.transpose() * (i+1) * 5
-    posemat[i * poz_sel.shape[0]:(i + 1) * poz_sel.shape[0], poz_sel] = X.transpose() * scale[i]
+                    points = self.bm3.forward().Jtr  # joints
 
-# Activation hook
-activation = {}
-def get_activation(name):
-    def hook(model, input, output):
-        activation[name] = output.detach()
-    return hook
-bm3.poser_body_pt.bodyprior_dec_fc1.register_forward_hook(get_activation('bodyprior_dec_fc1'))
+                    self.kp3dmat[i, vp_id, ipol_id, :, :] = torch.squeeze(points).detach().cpu().numpy()
 
-cnt = 0
-#np.random.seed(0)
-for i in tqdm(range(0, nexp)):
-    bm2.randomize_pose()
+                    body_mesh = trimesh.Trimesh(vertices=c2c(self.bm3.forward().v)[0],
+                                                faces=c2c(self.bm.f),
+                                                vertex_colors=np.tile(
+                                                    [135, 250, 206],
+                                                    (c2c(self.bm3.forward().v).shape[1], 1)))
 
-    t1 = bm.poZ_body.new(posemat[i,:]).detach()
-    t2 = bm2.poZ_body.data
+                    self._calculate_2d_points(i, vp_id, ipol_id, points, body_mesh, mv)
 
-    mv = MeshViewer(width=imw, height=imh, use_offscreen=True)
+                    mv.set_meshes([body_mesh], group_name='static')
+                    images[ipol_id] = mv.render()
 
-    for vId in range(3):
+                self._save_images(images, i, vp_id)
 
-        images = np.zeros([num_interp, imh, imw, 3])
-        viewpointmat[i, vId] = vp[vId]
-        for cId in range(0, num_interp):
-            # only go 10% in t2 direction
-            alpha = 1 - (cId / (num_interp * fraction))
-            # print(alpha)
+    def _calculate_2d_points(self, i, vp_id, ipol_id, points, body_mesh, mv):
+        # Calculate projected points
+        points_rot = self._rotate_points(vp_id, ipol_id, points, body_mesh)
+        rotation, translation, focal_length = g_utils.get_camera_params(mv, self.device)
+        camera_center = 0.5 * self.imh * torch.ones(1, 2, device=self.device, dtype=torch.float32)
+        projected_points = perspective_projection(points_rot.float(), rotation, translation,
+                                                  focal_length, camera_center)
 
-            t3 = (alpha * t1 + (1 - alpha) * t2)
-            t3mat[i, vId, cId, :] = t3.detach().cpu().numpy()
+        # Not used here, saved as a reference
+        self.kp2dmat[i, vp_id, ipol_id, :, :] = torch.squeeze(projected_points).detach().cpu().numpy()
 
-            bm3.poZ_body.data[:] = t3
+    def _rotate_points(self, vp_id: int, ipol_id: int, points, body_mesh: trimesh.Trimesh):
+        T = trimesh.transformations.translation_matrix([0, 0.2, 0])
+        R = trimesh.transformations.rotation_matrix(np.radians(self.view_angles[ipol_id] + self.vp[vp_id]), (0, 1, 0))
+        apply_mesh_tranfsormations_([body_mesh], T)
+        apply_mesh_tranfsormations_([body_mesh], R)
 
-            bm3.pose_body.data[:] = bm3.poser_body_pt.decode(bm3.poZ_body, output_type='aa').view(bm3.batch_size, -1)
+        # rotate point as we do the mesh
+        p2 = torch.cat((points, torch.ones((1, 55, 1)).to('cuda')), 2)
+        p3 = torch.matmul(torch.from_numpy(T).to('cuda'), torch.t(p2.squeeze()).double())
+        p3 = torch.matmul(torch.from_numpy(R).to('cuda'), p3)
+        return torch.unsqueeze(p3[:3, :].t(), 0)
 
-            poseaamat[i, vId, cId, : ] = torch.squeeze(bm3.pose_body).detach().cpu().numpy()
-
-            points = bm3.forward().Jtr
-
-            kp3dmat[i, vId, cId, : , :] = torch.squeeze(points).detach().cpu().numpy()
-
-            rotation = torch.eye(3, device=device, dtype=torch.float32).unsqueeze(0).expand(1, -1, -1)
-            a = list(mv.scene.get_nodes(name='pc-camera'))[0]
-            translation = torch.from_numpy(np.expand_dims(a.translation,axis=0).astype(np.float32)).to(device)
-            translation[0,2] = 5
-            focal_length = 1000
-            camera_center = 0.5 * imh * torch.ones(1, 2, device=device, dtype=torch.float32)
-
-            body_mesh = trimesh.Trimesh(vertices=c2c(bm3.forward().v)[0], faces=c2c(bm.f),
-                                        vertex_colors=np.tile([135, 250, 206], (c2c(bm3.forward().v).shape[1], 1)))
-
-            T = trimesh.transformations.translation_matrix([0, 0.2, 0])
-            R = trimesh.transformations.rotation_matrix(np.radians(view_angles[cId] + vp[vId]), (0, 1, 0))
-            apply_mesh_tranfsormations_([body_mesh], T)
-            apply_mesh_tranfsormations_([body_mesh], R)
-
-            #rotate point as we do the mesh
-            p2 = torch.cat((points, torch.ones((1, 55, 1)).to('cuda')), 2)
-            p3 = torch.matmul(torch.from_numpy(T).to('cuda'), torch.t(p2.squeeze()).double())
-            p3 = torch.matmul(torch.from_numpy(R).to('cuda'), p3)
-            p4 = torch.unsqueeze(p3[:3, :].t(), 0)
-
-            projected_points = perspective_projection(p4.float(), rotation, translation,
-                                                      focal_length, camera_center)
-
-            kp2dmat[i, vId, cId, : , :] = torch.squeeze(projected_points).detach().cpu().numpy()
-
-            mv.set_meshes([body_mesh], group_name='static')
-            images[cId] = mv.render()
-
+    def _save_images(self, images: np.array, iteration: int, vp_id: int):
+        """
+        Save pose as gif and each interpolation step as png.
+        In total there a 2 x num_interpolation images, because
+        the images are duplicated and added in reverse order.
+        """
         images = images.astype(np.uint8)
         a1 = list(images)
         a12 = a1.copy()
         a12.reverse()
         a1.extend(a12)
-        iio.mimsave(os.path.join(out_dir, 'VAE_%02d_%02d.gif' % (i , vId)), a1, duration=1 / 24)
+        iio.mimsave(os.path.join(self.out_dir, 'VAE_%02d_%02d.gif' % (iteration, vp_id)), a1, duration=1 / 24)
 
-        for cId, imgi in enumerate(a1):
-            cv2.imwrite(os.path.join(out_dir, 'VAE_%04d.png' % cnt), imgi)
-            cnt = cnt + 1
+        for ipol_id, imgi in enumerate(a1):
+            cv2.imwrite(os.path.join(self.out_dir, 'VAE_%02d_%02d_%02d.png' % (iteration, vp_id, ipol_id)), imgi)
 
-#t = np.transpose(t3mat, (2, 1, 0))
-#t2 = np.reshape(t,(32, num_interp*nexp), order='F')
-#plt.imsave(os.path.join(out_dir, 'params_time_VAE2.png'),t2)
-#np.save(os.path.join(out_dir, 'params_time_VAE2.npy'),t2)
-np.save(os.path.join(out_dir, 'params_time_VAE2.npy'), t3mat)
-np.save(os.path.join(out_dir, 'params_viewpoint_VAE2.npy'), viewpointmat)
-np.save(os.path.join(out_dir, 'kp2dmat.npy'), kp2dmat)
-np.save(os.path.join(out_dir, 'kp3dmat.npy'), kp3dmat)
-np.save(os.path.join(out_dir, 'poseaamat.npy'), poseaamat)
-np.save(os.path.join(out_dir, 'exp_params.npy'), [num_interp, nrand])
-np.save(os.path.join(out_dir, 'scale.npy'), scale)
-np.save(os.path.join(out_dir, 'poz_sel.npy'), poz_sel)
+    def save_numpy_arrays(self):
+        np.save(os.path.join(self.out_dir, 'params_time_VAE2.npy'), self.t3mat)
+        np.save(os.path.join(self.out_dir, 'params_viewpoint_VAE2.npy'), self.viewpointmat)
+        np.save(os.path.join(self.out_dir, 'kp2dmat.npy'), self.kp2dmat)
+        np.save(os.path.join(self.out_dir, 'kp3dmat.npy'), self.kp3dmat)
+        np.save(os.path.join(self.out_dir, 'poseaamat.npy'), self.poseaamat)
+        np.save(os.path.join(self.out_dir, 'exp_params.npy'), [self.num_interpol, self.nrand])
+        np.save(os.path.join(self.out_dir, 'scale.npy'), self.scale)
+        np.save(os.path.join(self.out_dir, 'poz_sel.npy'), self.poz_sel)
+
+
+if __name__ == "__main__":
+    # experiment directory & body model
+    # obtain from https://smpl-x.is.tue.mpg.de/downloads
+    _smpl_exp_dir = '../data/vposer_v1_0/'
+    _bm_path = '../data/models/smplx/SMPLX_MALE.npz'
+
+    _out_dir = makepath(os.path.join('../data/evaluations', 'blapose_stims_vp_p17'))
+    print(f'Output directory: {_out_dir}')
+    _device = torch.device('cuda')
+
+    generator = GenerateVposerStimsViewpoint(_smpl_exp_dir, _bm_path, _out_dir, _device)
+    generator.create_poses()
+    generator.save_numpy_arrays()
+
+
 
 
 
