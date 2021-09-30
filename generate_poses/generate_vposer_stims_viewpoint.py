@@ -155,6 +155,14 @@ for i in range(nrand):
     #posemat[i*poz_sel.shape[0]:(i+1)*poz_sel.shape[0], poz_sel] = X.transpose() * (i+1) * 5
     posemat[i * poz_sel.shape[0]:(i + 1) * poz_sel.shape[0], poz_sel] = X.transpose() * scale[i]
 
+# Activation hook
+activation = {}
+def get_activation(name):
+    def hook(model, input, output):
+        activation[name] = output.detach()
+    return hook
+bm3.poser_body_pt.bodyprior_dec_fc1.register_forward_hook(get_activation('bodyprior_dec_fc1'))
+
 cnt = 0
 #np.random.seed(0)
 for i in tqdm(range(0, nexp)):
