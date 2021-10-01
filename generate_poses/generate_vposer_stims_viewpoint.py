@@ -202,10 +202,10 @@ class GenerateVposerStimsViewpoint:
         a12 = a1.copy()
         a12.reverse()
         a1.extend(a12)
-        iio.mimsave(os.path.join(self.out_dir, 'VAE_%02d_%02d.gif' % (iteration, vp_id)), a1, duration=1 / 24)
+        iio.mimsave(os.path.join(self.out_dir, 'gif', 'VAE_%02d_%02d.gif' % (iteration, vp_id)), a1, duration=1 / 24)
 
         for ipol_id, imgi in enumerate(a1):
-            cv2.imwrite(os.path.join(self.out_dir, 'VAE_%02d_%02d_%02d.png' % (iteration, vp_id, ipol_id)), imgi)
+            cv2.imwrite(os.path.join(self.out_dir, 'png', 'VAE_%02d_%02d_%02d.png' % (iteration, vp_id, ipol_id)), imgi)
 
     def save_numpy_arrays(self):
         np.save(os.path.join(self.out_dir, 'params_time_VAE2.npy'), self.t3mat)
@@ -219,15 +219,19 @@ class GenerateVposerStimsViewpoint:
 
 
 if __name__ == "__main__":
-    # experiment directory & body model
-    # obtain from https://smpl-x.is.tue.mpg.de/downloads
+    # Experiment directory & body model
+    # Obtain from https://smpl-x.is.tue.mpg.de/downloads
     _smpl_exp_dir = '../data/vposer_v1_0/'
     _bm_path = '../data/models/smplx/SMPLX_MALE.npz'
 
     _out_dir = makepath(os.path.join('../data/evaluations', 'blapose_stims_vp_p17'))
+    makepath(os.path.join(_out_dir, 'gif'))
+    makepath(os.path.join(_out_dir, 'png'))
     print(f'Output directory: {_out_dir}')
+
     _device = torch.device('cuda')
 
+    # Execute
     generator = GenerateVposerStimsViewpoint(_smpl_exp_dir, _bm_path, _out_dir, _device)
     generator.create_poses()
     generator.save_numpy_arrays()
