@@ -72,12 +72,12 @@ def perspective_projection(points, rotation, translation,
 class GenerateVposerStimsViewpoint:
     def __init__(self, smpl_exp_dir: str, bm_path: str, out_dir: str, device: torch.device):
         self.smpl_exp_dir = smpl_exp_dir
-        self. bm_path = bm_path
+        self.bm_path = bm_path
         self.out_dir = out_dir
         self.device = device
 
         self.bm = BodyModelWithPoser(bm_path=bm_path, batch_size=1, model_type='smplx', poser_type='vposer',
-                                     smpl_exp_dir=smpl_exp_dir, mano_exp_dir=None).to('cuda')
+                                     smpl_exp_dir=smpl_exp_dir).to('cuda')
         self.bm2 = BodyModelWithPoser(bm_path=bm_path, batch_size=1, model_type='smplx', poser_type='vposer',
                                       smpl_exp_dir=smpl_exp_dir).to('cuda')
         self.bm3 = BodyModelWithPoser(bm_path=bm_path, batch_size=1, model_type='smplx', poser_type='vposer',
