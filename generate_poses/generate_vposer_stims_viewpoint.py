@@ -157,13 +157,14 @@ class GenerateVposerStimsViewpoint:
                                                 vertex_colors=np.tile([135, 250, 206],
                                                                       (c2c(self.bm3.forward().v).shape[1], 1)))
 
-                    mv.set_meshes([body_mesh], group_name='static')
-                    images[ipol_id] = mv.render()
-
                     # Calculate and save kinematic 2D and 3D points
+                    # This also changes 'body_mesh' in place - todo
                     self.kp3dmat[i, vp_id, ipol_id, :, :] = torch.squeeze(points).detach().cpu().numpy()
                     proj_2d_points = self._calculate_2d_points(vp_id, ipol_id, points, body_mesh, mv)
                     self.kp2dmat[i, vp_id, ipol_id, :, :] = torch.squeeze(proj_2d_points).detach().cpu().numpy()
+
+                    mv.set_meshes([body_mesh], group_name='static')
+                    images[ipol_id] = mv.render()
 
                 self._save_images(images, i, vp_id)
 
