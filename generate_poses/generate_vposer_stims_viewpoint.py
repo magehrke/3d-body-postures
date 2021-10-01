@@ -153,18 +153,17 @@ class GenerateVposerStimsViewpoint:
 
                     points = self.bm3.forward().Jtr  # joints
 
-                    self.kp3dmat[i, vp_id, ipol_id, :, :] = torch.squeeze(points).detach().cpu().numpy()
+                    body_mesh = trimesh.Trimesh(vertices=c2c(self.bm3.forward().v)[0], faces=c2c(self.bm.f),
+                                                vertex_colors=np.tile([135, 250, 206],
+                                                                      (c2c(self.bm3.forward().v).shape[1], 1)))
 
-                    body_mesh = trimesh.Trimesh(vertices=c2c(self.bm3.forward().v)[0],
-                                                faces=c2c(self.bm.f),
-                                                vertex_colors=np.tile(
-                                                    [135, 250, 206],
-                                                    (c2c(self.bm3.forward().v).shape[1], 1)))
-
-                    proj_2d_points = self._calculate_2d_points(vp_id, ipol_id, points, body_mesh, mv)
-                    self.kp2dmat[i, vp_id, ipol_id, :, :] = torch.squeeze(proj_2d_points).detach().cpu().numpy()
                     mv.set_meshes([body_mesh], group_name='static')
                     images[ipol_id] = mv.render()
+
+                    # Calculate and save kinematic 2D and 3D points
+                    self.kp3dmat[i, vp_id, ipol_id, :, :] = torch.squeeze(points).detach().cpu().numpy()
+                    proj_2d_points = self._calculate_2d_points(vp_id, ipol_id, points, body_mesh, mv)
+                    self.kp2dmat[i, vp_id, ipol_id, :, :] = torch.squeeze(proj_2d_points).detach().cpu().numpy()
 
                 self._save_images(images, i, vp_id)
 
@@ -176,7 +175,6 @@ class GenerateVposerStimsViewpoint:
         projected_points = perspective_projection(points_rot.float(), rotation, translation,
                                                   focal_length, camera_center)
         return projected_points
-
 
     def _rotate_points(self, vp_id: int, ipol_id: int, points, body_mesh: trimesh.Trimesh):
         T = trimesh.transformations.translation_matrix([0, 0.2, 0])
