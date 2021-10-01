@@ -161,23 +161,22 @@ class GenerateVposerStimsViewpoint:
                                                     [135, 250, 206],
                                                     (c2c(self.bm3.forward().v).shape[1], 1)))
 
-                    self._calculate_2d_points(i, vp_id, ipol_id, points, body_mesh, mv)
-
+                    proj_2d_points = self._calculate_2d_points(vp_id, ipol_id, points, body_mesh, mv)
+                    self.kp2dmat[i, vp_id, ipol_id, :, :] = torch.squeeze(proj_2d_points).detach().cpu().numpy()
                     mv.set_meshes([body_mesh], group_name='static')
                     images[ipol_id] = mv.render()
 
                 self._save_images(images, i, vp_id)
 
-    def _calculate_2d_points(self, i, vp_id, ipol_id, points, body_mesh, mv):
+    def _calculate_2d_points(self, vp_id, ipol_id, points, body_mesh, mv):
         # Calculate projected points
         points_rot = self._rotate_points(vp_id, ipol_id, points, body_mesh)
         rotation, translation, focal_length = g_utils.get_camera_params(mv, self.device)
         camera_center = 0.5 * self.imh * torch.ones(1, 2, device=self.device, dtype=torch.float32)
         projected_points = perspective_projection(points_rot.float(), rotation, translation,
                                                   focal_length, camera_center)
+        return projected_points
 
-        # Not used here, saved as a reference
-        self.kp2dmat[i, vp_id, ipol_id, :, :] = torch.squeeze(projected_points).detach().cpu().numpy()
 
     def _rotate_points(self, vp_id: int, ipol_id: int, points, body_mesh: trimesh.Trimesh):
         T = trimesh.transformations.translation_matrix([0, 0.2, 0])
