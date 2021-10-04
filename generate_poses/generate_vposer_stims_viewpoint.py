@@ -80,35 +80,40 @@ class GenerateVposerStimsViewpoint:
         self.imw, self.imh = 400, 400
         self.fraction = 15
 
-        # TODO
-        self.poz_sel = np.arange(32)
-        # TODO
-        self.nrand = 6
+        # Dimension array of the latent stimuli size
+        self.poz_dim_array = np.arange(32)
+        # The number of orthonormal basis we will create
+        # We will use each column of each basis as latent stimuli (poZ)
+        # Advantage of using ONB: we create stimuli in each latent direction
+        self.num_onb = 6
+        # Scaling of each orthonormal basis
+        # The higher the scaling, the more extreme the samples
+        # The latent space (poZ) is constructed by using centered normal distributions
+        self.scale = [8, 8, 32, 32, 96, 96]
+        # Number of latent stimuli (poZ)
+        self.n_stim = self.poz_dim_array.shape[0] * self.num_onb
+
+        # Create orthonormal basis, scale it and use the columns to fill poz stimuli vector
+        self.poz_mat = np.zeros((self.n_stim, 32))
+        for i in range(self.num_onb):
+            x = rand_ndim_onb(self.poz_dim_array.shape[-1])
+            self.poz_mat[i * self.poz_dim_array.shape[-1]: (i + 1) * self.poz_dim_array.shape[0], self.poz_dim_array] \
+                = x.transpose() * self.scale[i]
 
         # Viewpoint
         self.num_vp = 3
         self.vp = [-45, 0, 45]
-        self.scale = [8, 8, 32, 32, 96, 96]
+        self.viewpointmat = np.zeros((self.n_stim, self.num_vp))
 
-        # TODO
-        self.nexp = self.poz_sel.shape[0] * self.nrand
+        self.t3mat = np.zeros((self.n_stim, self.num_vp, self.num_interpol, 32))
+        self.kp2dmat = np.zeros((self.n_stim, self.num_vp, self.num_interpol, 55, 2))
+        self.kp3dmat = np.zeros((self.n_stim, self.num_vp, self.num_interpol, 55, 3))
+        self.poseaamat = np.zeros((self.n_stim, self.num_vp, self.num_interpol, 63))
 
-        self.t3mat = np.zeros((self.nexp, self.num_vp, self.num_interpol, 32))
-        self.kp2dmat = np.zeros((self.nexp, self.num_vp, self.num_interpol, 55, 2))
-        self.kp3dmat = np.zeros((self.nexp, self.num_vp, self.num_interpol, 55, 3))
-        self.poseaamat = np.zeros((self.nexp, self.num_vp, self.num_interpol, 63))
-
-        self.posemat = np.zeros((self.nexp, 32))
-        self.mat2d = np.zeros((self.nexp, self.num_vp, 55))
-        self.viewpointmat = np.zeros((self.nexp, self.num_vp))
-
-        for i in range(self.nrand):
-            X = rand_ndim_onb(self.poz_sel.shape[0])
-            self.posemat[i * self.poz_sel.shape[0]:(i + 1) * self.poz_sel.shape[0], self.poz_sel] \
-                = X.transpose() * self.scale[i]
+        self.mat2d = np.zeros((self.n_stim, self.num_vp, 55))
 
         # Save activations of decoding layers
-        # Will be overwritten everytime forward() or decode() is again
+        # Will be overwritten everytime forward() or decode() is called
         self.activation = {}
         self.bm3.poser_body_pt.bodyprior_dec_fc1.register_forward_hook(self.activation_hook('bodyprior_dec_fc1'))
         self.bm3.poser_body_pt.bodyprior_dec_fc2.register_forward_hook(self.activation_hook('bodyprior_dec_fc2'))
@@ -120,10 +125,10 @@ class GenerateVposerStimsViewpoint:
         return hook
 
     def create_poses(self):
-        for i in tqdm(range(0, self.nexp)):
+        for i in tqdm(range(self.n_stim)):
             self.bm2.randomize_pose()
 
-            t1 = self.bm.poZ_body.new(self.posemat[i, :]).detach()
+            t1 = self.bm.poZ_body.new(self.poz_mat[i, :]).detach()
             t2 = self.bm2.poZ_body.data
 
             mv = MeshViewer(width=self.imw, height=self.imh, use_offscreen=True)
@@ -143,7 +148,7 @@ class GenerateVposerStimsViewpoint:
 
                     self.poseaamat[i, vp_id, ipol_id, :] = torch.squeeze(self.bm3.pose_body).detach().cpu().numpy()
 
-                    points = self.bm3.forward().Jtr  # joints
+                    points = self.bm3.forward().Jtr  # 55 joints ?
 
                     body_mesh = trimesh.Trimesh(vertices=c2c(self.bm3.forward().v)[0], faces=c2c(self.bm.f),
                                                 vertex_colors=np.tile([135, 250, 206],
@@ -203,9 +208,9 @@ class GenerateVposerStimsViewpoint:
         np.save(os.path.join(self.out_dir, 'kp2dmat.npy'), self.kp2dmat)
         np.save(os.path.join(self.out_dir, 'kp3dmat.npy'), self.kp3dmat)
         np.save(os.path.join(self.out_dir, 'poseaamat.npy'), self.poseaamat)
-        np.save(os.path.join(self.out_dir, 'exp_params.npy'), [self.num_interpol, self.nrand])
+        np.save(os.path.join(self.out_dir, 'exp_params.npy'), [self.num_interpol, self.num_onb])
         np.save(os.path.join(self.out_dir, 'scale.npy'), self.scale)
-        np.save(os.path.join(self.out_dir, 'poz_sel.npy'), self.poz_sel)
+        np.save(os.path.join(self.out_dir, 'poz_sel.npy'), self.poz_dim_array)
 
 
 if __name__ == "__main__":
