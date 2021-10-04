@@ -5,7 +5,7 @@ import trimesh
 import numpy as np
 from tqdm import tqdm
 import imageio as iio
-import scipy.linalg as sl
+import scipy.linalg
 from human_body_prior.body_model.body_model import BodyModelWithPoser
 from human_body_prior.mesh.mesh_viewer import MeshViewer
 from human_body_prior.tools.omni_tools import copy2cpu as c2c
@@ -15,27 +15,19 @@ import generate_utils as g_utils
 
 
 def rand_ndim_onb(ndim):
-    '''
-    X=[];
-    for i = 31:-1:1
-    R = (rand(32,i)-0.5)*2;
-    N = null([X R]');
-    X = [X N];
-    end
-    X = [X null(X')];
-    A=X'*X;
-    mean(A(triu(A,1)>0))
-    '''
-    X = np.zeros([ndim, ndim])
+    """
+    Create a random n-dimensional orthonormal basis.
+    """
+    x = np.zeros([ndim, ndim])
     for i in range(ndim):
-        R = (np.random.rand(ndim,ndim-(i+1))-0.5)*2
-        if i>0:
-            N = sl.null_space(np.concatenate((X[:,0:i],R),axis=1).transpose())
+        # Random vector in [-1, 1]
+        r = (np.random.rand(ndim, ndim-(i+1))-0.5)*2
+        if i > 0:
+            n = scipy.linalg.null_space(np.concatenate((x[:, 0:i], r), axis=1).transpose())
         else:
-            N = sl.null_space(R.transpose())
-        X[:,i]=N.squeeze()
-
-    return X
+            n = scipy.linalg.null_space(r.transpose())
+        x[:, i] = n.squeeze()
+    return x
 
 
 def perspective_projection(points, rotation, translation,
