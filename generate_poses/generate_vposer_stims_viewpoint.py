@@ -113,15 +113,20 @@ class GenerateVposerStimsViewpoint:
         self.mat2d = np.zeros((self.n_stim, self.num_vp, 55))
 
         # Save activations of decoding layers
-        # Will be overwritten everytime forward() or decode() is called
-        self.activation = {}
-        self.bm3.poser_body_pt.bodyprior_dec_fc1.register_forward_hook(self.activation_hook('bodyprior_dec_fc1'))
-        self.bm3.poser_body_pt.bodyprior_dec_fc2.register_forward_hook(self.activation_hook('bodyprior_dec_fc2'))
-        self.bm3.poser_body_pt.bodyprior_dec_out.register_forward_hook(self.activation_hook('bodyprior_dec_out'))
+        self.act = {}  # will be overwritten everytime forward() or decode() is called
+        self.act_fc1 = np.zeros((self.n_stim, 512))
+        self.act_fc2 = np.zeros((self.n_stim, 512))
+        self.act_out = np.zeros((self.n_stim, 126))
 
-    def activation_hook(self, name):
+        # Register activation forward hooks
+        self.bm3.poser_body_pt.bodyprior_dec_fc1.register_forward_hook(self._activation_hook('bodyprior_dec_fc1'))
+        self.bm3.poser_body_pt.bodyprior_dec_fc2.register_forward_hook(self._activation_hook('bodyprior_dec_fc2'))
+        self.bm3.poser_body_pt.bodyprior_dec_out.register_forward_hook(self._activation_hook('bodyprior_dec_out'))
+
+
+    def _activation_hook(self, name):
         def hook(model, input, output):
-            self.activation[name] = output.detach()
+            self.act[name] = output.detach()
         return hook
 
     def create_poses(self):
@@ -143,8 +148,13 @@ class GenerateVposerStimsViewpoint:
 
                     self.bm3.poZ_body.data[:] = t3
 
-                    self.bm3.pose_body.data[:] = self.bm3.poser_body_pt.decode(self.bm3.poZ_body, output_type='aa').view(
-                        self.bm3.batch_size, -1)
+                    self.bm3.pose_body.data[:] = \
+                        self.bm3.poser_body_pt.decode(self.bm3.poZ_body, output_type='aa').view(self.bm3.batch_size, -1)
+
+                    # Save activations of neural network
+                    self.act_fc1[i, :] = torch.squeeze(self.act['bodyprior_dec_fc1']).detach().cpu().numpy()
+                    self.act_fc2[i, :] = torch.squeeze(self.act['bodyprior_dec_fc2']).detach().cpu().numpy()
+                    self.act_out[i, :] = torch.squeeze(self.act['bodyprior_dec_out']).detach().cpu().numpy()
 
                     self.poseaamat[i, vp_id, ipol_id, :] = torch.squeeze(self.bm3.pose_body).detach().cpu().numpy()
 
@@ -211,6 +221,7 @@ class GenerateVposerStimsViewpoint:
         np.save(os.path.join(self.out_dir, 'exp_params.npy'), [self.num_interpol, self.num_onb])
         np.save(os.path.join(self.out_dir, 'scale.npy'), self.scale)
         np.save(os.path.join(self.out_dir, 'poz_sel.npy'), self.poz_dim_array)
+        np.save(os.path.join(self.out_dir, 'activations.npy'), [self.act_fc1, self.act_fc2, self.act_out])
 
 
 if __name__ == "__main__":
