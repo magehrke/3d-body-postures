@@ -13,7 +13,7 @@ def compare_stims(original_dir: str, reconstructed_dir: str, out_dir: str) -> No
         indx = f_recon.find(f'scale')
         if indx != 0:
             f_start = f_recon[:indx]
-            f_recon = f_start + f'Inter_00.png'
+            f_recon = f_start + f'Ipol_0.png'
 
         im1 = Image.open(f)
         im2 = Image.open(os.path.join(reconstructed_dir, f_recon))

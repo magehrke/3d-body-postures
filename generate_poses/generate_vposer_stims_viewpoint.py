@@ -247,10 +247,12 @@ class GenerateVposerStimsViewpoint:
         a12 = a1.copy()
         a12.reverse()
         a1.extend(a12)
-        iio.mimsave(os.path.join(self.out_dir, 'gif', 'VAE_%02d_%02d.gif' % (iteration, vp_id)), a1, duration=1 / 24)
+        iio.mimsave(os.path.join(self.out_dir, 'gif', 'Stim_uparam_%d_Viewpoint_%d.gif'
+                                 % (self.uparam[i], vp_id+1)), a1, duration=1 / 24)
 
         for ipol_id, imgi in enumerate(a1):
-            cv2.imwrite(os.path.join(self.out_dir, 'png', 'VAE_%02d_%02d_%02d.png' % (iteration, vp_id, ipol_id)), imgi)
+            cv2.imwrite(os.path.join(self.out_dir, 'png', 'Stim_uparam_%d_Viewpoint_%d_Ipol_%d.png'
+                                     % (self.uparam[i], vp_id+1, ipol_id)), imgi)
 
     def save_numpy_arrays(self):
         np.save(os.path.join(self.out_dir, 'params_time_VAE2.npy'), self.t3mat)
