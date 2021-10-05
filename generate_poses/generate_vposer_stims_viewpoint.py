@@ -237,7 +237,7 @@ class GenerateVposerStimsViewpoint:
         p3 = torch.matmul(torch.from_numpy(R).to('cuda'), p3)
         return torch.unsqueeze(p3[:3, :].t(), 0)
 
-    def _save_images(self, images: np.array, iteration: int, vp_id: int):
+    def _save_images(self, images: np.array, i: int, vp_id: int):
         """
         Save pose as gif and each interpolation step as png.
         In total there a 2 x num_interpolation images, because
@@ -266,7 +266,7 @@ class GenerateVposerStimsViewpoint:
                     'bodyprior_dec_out': self.act_out}
         if self.uparam is not None:
             act_dict['uparam'] = self.uparam
-        scipy.io.savemat(os.path.join(self.out_dir, 'activations.npy'), act_dict)
+        scipy.io.savemat(os.path.join(self.out_dir, 'activations.mat'), act_dict)
 
 
 if __name__ == "__main__":
@@ -274,8 +274,7 @@ if __name__ == "__main__":
     # Obtain from https://smpl-x.is.tue.mpg.de/downloads
     _smpl_exp_dir = '../data/vposer_v1_0/'
     _bm_path = '../data/models/smplx/SMPLX_MALE.npz'
-
-    _out_dir = makepath(os.path.join('../data/evaluations', 'blapose_stims_vp_p17'))
+    _out_dir = makepath(os.path.join('../data/evaluations', 'VAEparams'))
     makepath(os.path.join(_out_dir, 'gif'))
     makepath(os.path.join(_out_dir, 'png'))
     print(f'Output directory: {_out_dir}')
