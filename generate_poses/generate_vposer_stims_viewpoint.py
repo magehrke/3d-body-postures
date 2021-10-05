@@ -75,8 +75,12 @@ def load_poz_stimuli_from_mat_file(mat_file_path: str) -> (np.array, np.array):
     for i in range(0, len(raw_stimuli)):
         poz_stimuli.append(raw_stimuli[i][0])
         poz_ids.append(raw_ids[i][0])
+    poz_ids = np.vstack(poz_ids)
+    poz_stimuli = np.vstack(poz_stimuli)
+    assert poz_ids.shape[0] == poz_stimuli.shape[0]
 
-    return np.vstack(poz_ids), np.vstack(poz_stimuli)
+    poz_ids_unique, indices = np.unique(poz_ids, return_index=True)
+    return poz_ids_unique, poz_stimuli[indices]
 
 
 def generate_random_poz_stimuli(out_dir: str) -> np.array:
