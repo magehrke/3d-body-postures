@@ -6,6 +6,7 @@ import numpy as np
 from tqdm import tqdm
 import imageio as iio
 import scipy.linalg
+import scipy.io
 from human_body_prior.body_model.body_model import BodyModelWithPoser
 from human_body_prior.mesh.mesh_viewer import MeshViewer
 from human_body_prior.tools.omni_tools import copy2cpu as c2c
@@ -210,10 +211,12 @@ class GenerateVposerStimsViewpoint:
         np.save(os.path.join(self.out_dir, 'kp2dmat.npy'), self.kp2dmat)
         np.save(os.path.join(self.out_dir, 'kp3dmat.npy'), self.kp3dmat)
         np.save(os.path.join(self.out_dir, 'poseaamat.npy'), self.poseaamat)
-        np.save(os.path.join(self.out_dir, 'exp_params.npy'), [self.num_interpol, self.num_onb])
-        np.save(os.path.join(self.out_dir, 'scale.npy'), self.scale)
-        np.save(os.path.join(self.out_dir, 'poz_sel.npy'), self.poz_dim_array)
-        np.save(os.path.join(self.out_dir, 'activations.npy'), [self.act_fc1, self.act_fc2, self.act_out])
+        np.save(os.path.join(self.out_dir, 'exp_params.npy'), [self.num_interpol])
+        act_dict = {'bodyprior_dec_fc1': self.act_fc1, 'bodyprior_dec_fc2': self.act_fc2,
+                    'bodyprior_dec_out': self.act_out}
+        if self.uparam is not None:
+            act_dict['uparam'] = self.uparam
+        scipy.io.savemat(os.path.join(self.out_dir, 'activations.npy'), act_dict)
 
 
 if __name__ == "__main__":
