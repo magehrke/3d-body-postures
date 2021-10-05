@@ -83,7 +83,7 @@ def load_poz_stimuli_from_mat_file(mat_file_path: str) -> (np.array, np.array):
     return poz_ids_unique, poz_stimuli[indices]
 
 
-def generate_random_poz_stimuli(out_dir: str) -> np.array:
+def generate_random_poz_stimuli(out_dir: str) -> (np.array, np.array):
     # Description of experiment parameter
     stim_params = {
         # Some arbitrary array that creates poses
@@ -105,8 +105,9 @@ def generate_random_poz_stimuli(out_dir: str) -> np.array:
         poz_mat[i * stim_params['poz_sel_array'].shape[-1]: (i + 1) * stim_params['poz_sel_array'].shape[0],
                 stim_params['poz_sel_array']] = x.transpose() * stim_params['scale'][i]
 
+    uparam = np.arange(1, poz_mat.shape[0]+1)
     np.save(os.path.join(out_dir, 'stim_creation_params.npy'), stim_params)
-    return poz_mat
+    return uparam, poz_mat
 
 
 class GenerateVposerStimsViewpoint:
@@ -137,8 +138,7 @@ class GenerateVposerStimsViewpoint:
             assert uparam.shape[0] == poz_mat.shape[0]
             self.uparam  = uparam
         else:
-            self.poz_mat = generate_random_poz_stimuli(out_dir=self.out_dir)
-            self.uparam = None
+            self.uparam, self.poz_mat = generate_random_poz_stimuli(out_dir=self.out_dir)
 
         # Number of latent stimuli (poZ)
         self.n_stim = self.poz_mat.shape[0]
