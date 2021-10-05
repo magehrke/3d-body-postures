@@ -140,7 +140,7 @@ class GenerateVposerStimsViewpoint:
         else:
             self.uparam, self.poz_mat = generate_random_poz_stimuli(out_dir=self.out_dir)
 
-        # Number of latent stimuli (poZ)
+        # Number of latent (poZ) stimuli
         self.n_stim = self.poz_mat.shape[0]
 
         # Viewpoint
@@ -204,33 +204,34 @@ class GenerateVposerStimsViewpoint:
                                                 vertex_colors=np.tile([135, 250, 206],
                                                                       (c2c(self.bm.forward().v).shape[1], 1)))
 
-                    # Calculate and save kinematic 2D and 3D points
-                    # This also changes 'body_mesh' in place - todo
-                    self.kp3dmat[i, vp_id, ipol_id, :, :] = torch.squeeze(points).detach().cpu().numpy()
-                    proj_2d_points = self._calculate_2d_points(vp_id, ipol_id, points, body_mesh, mv)
-                    self.kp2dmat[i, vp_id, ipol_id, :, :] = torch.squeeze(proj_2d_points).detach().cpu().numpy()
+                    # Apply transformations to the mesh
+                    T = trimesh.transformations.translation_matrix([0, 0.2, 0])
+                    radians = np.radians(self.view_angles[ipol_id] + self.vp[vp_id])
+                    R = trimesh.transformations.rotation_matrix(radians, (0, 1, 0))
+                    apply_mesh_tranfsormations_([body_mesh], T)
+                    apply_mesh_tranfsormations_([body_mesh], R)
 
                     mv.set_meshes([body_mesh], group_name='static')
                     images[ipol_id] = mv.render()
 
+                    # Calculate and save kinematic 2D and 3D points
+                    self.kp3dmat[i, vp_id, ipol_id, :, :] = torch.squeeze(points).detach().cpu().numpy()
+                    proj_2d_points = self._calculate_2d_points(points, mv, T, R)
+                    self.kp2dmat[i, vp_id, ipol_id, :, :] = torch.squeeze(proj_2d_points).detach().cpu().numpy()
+
                 self._save_images(images, i, vp_id)
 
-    def _calculate_2d_points(self, vp_id, ipol_id, points, body_mesh, mv):
+    def _calculate_2d_points(self, points, mv, T, R):
         # Calculate projected points
-        points_rot = self._rotate_points(vp_id, ipol_id, points, body_mesh)
+        points_rot = self._rotate_points(points, T, R)
         rotation, translation, focal_length = g_utils.get_camera_params(mv, self.device)
         camera_center = 0.5 * self.imh * torch.ones(1, 2, device=self.device, dtype=torch.float32)
         projected_points = perspective_projection(points_rot.float(), rotation, translation,
                                                   focal_length, camera_center)
         return projected_points
 
-    def _rotate_points(self, vp_id: int, ipol_id: int, points, body_mesh: trimesh.Trimesh):
-        T = trimesh.transformations.translation_matrix([0, 0.2, 0])
-        R = trimesh.transformations.rotation_matrix(np.radians(self.view_angles[ipol_id] + self.vp[vp_id]), (0, 1, 0))
-        apply_mesh_tranfsormations_([body_mesh], T)
-        apply_mesh_tranfsormations_([body_mesh], R)
-
-        # rotate point as we do the mesh
+    @staticmethod
+    def _rotate_points(points, T, R):
         p2 = torch.cat((points, torch.ones((1, 55, 1)).to('cuda')), 2)
         p3 = torch.matmul(torch.from_numpy(T).to('cuda'), torch.t(p2.squeeze()).double())
         p3 = torch.matmul(torch.from_numpy(R).to('cuda'), p3)
