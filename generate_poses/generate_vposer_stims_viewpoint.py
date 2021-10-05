@@ -77,10 +77,6 @@ class GenerateVposerStimsViewpoint:
 
         self.bm = BodyModelWithPoser(bm_path=bm_path, batch_size=1, model_type='smplx', poser_type='vposer',
                                      smpl_exp_dir=smpl_exp_dir).to('cuda')
-        self.bm2 = BodyModelWithPoser(bm_path=bm_path, batch_size=1, model_type='smplx', poser_type='vposer',
-                                      smpl_exp_dir=smpl_exp_dir).to('cuda')
-        self.bm3 = BodyModelWithPoser(bm_path=bm_path, batch_size=1, model_type='smplx', poser_type='vposer',
-                                      smpl_exp_dir=smpl_exp_dir).to('cuda')
 
         self.num_interpol = 18
         self.view_angles = np.linspace(0, 2, num=self.num_interpol)
@@ -118,10 +114,9 @@ class GenerateVposerStimsViewpoint:
         self.act_out = np.zeros((self.n_stim, 126))
 
         # Register activation forward hooks
-        self.bm3.poser_body_pt.bodyprior_dec_fc1.register_forward_hook(self._activation_hook('bodyprior_dec_fc1'))
-        self.bm3.poser_body_pt.bodyprior_dec_fc2.register_forward_hook(self._activation_hook('bodyprior_dec_fc2'))
-        self.bm3.poser_body_pt.bodyprior_dec_out.register_forward_hook(self._activation_hook('bodyprior_dec_out'))
-
+        self.bm.poser_body_pt.bodyprior_dec_fc1.register_forward_hook(self._activation_hook('bodyprior_dec_fc1'))
+        self.bm.poser_body_pt.bodyprior_dec_fc2.register_forward_hook(self._activation_hook('bodyprior_dec_fc2'))
+        self.bm.poser_body_pt.bodyprior_dec_out.register_forward_hook(self._activation_hook('bodyprior_dec_out'))
 
     def _activation_hook(self, name):
         def hook(model, input, output):
@@ -130,11 +125,8 @@ class GenerateVposerStimsViewpoint:
 
     def create_poses(self):
         for i in tqdm(range(self.n_stim)):
-            self.bm2.randomize_pose()
 
             t1 = self.bm.poZ_body.new(self.poz_mat[i, :]).detach()
-            t2 = self.bm2.poZ_body.data
-
             mv = MeshViewer(width=self.imw, height=self.imh, use_offscreen=True)
 
             for vp_id in range(3):
@@ -142,26 +134,27 @@ class GenerateVposerStimsViewpoint:
                 self.viewpointmat[i, vp_id] = self.vp[vp_id]
                 for ipol_id in range(0, self.num_interpol):
                     alpha = 1 - (ipol_id / (self.num_interpol * self.fraction))
-                    t3 = (alpha * t1 + (1 - alpha) * t2)
-                    self.t3mat[i, vp_id, ipol_id, :] = t3.detach().cpu().numpy()
+                    # Interpolation in the direction of the zero vector
+                    t2 = (alpha * t1 + (1 - alpha) * torch.zeros([1, 32]).to('cuda'))
+                    self.t3mat[i, vp_id, ipol_id, :] = t2.detach().cpu().numpy()
 
-                    self.bm3.poZ_body.data[:] = t3
+                    self.bm.poZ_body.data[:] = t2
 
-                    self.bm3.pose_body.data[:] = \
-                        self.bm3.poser_body_pt.decode(self.bm3.poZ_body, output_type='aa').view(self.bm3.batch_size, -1)
+                    self.bm.pose_body.data[:] = \
+                        self.bm.poser_body_pt.decode(self.bm.poZ_body, output_type='aa').view(self.bm.batch_size, -1)
 
                     # Save activations of neural network
                     self.act_fc1[i, :] = torch.squeeze(self.act['bodyprior_dec_fc1']).detach().cpu().numpy()
                     self.act_fc2[i, :] = torch.squeeze(self.act['bodyprior_dec_fc2']).detach().cpu().numpy()
                     self.act_out[i, :] = torch.squeeze(self.act['bodyprior_dec_out']).detach().cpu().numpy()
 
-                    self.poseaamat[i, vp_id, ipol_id, :] = torch.squeeze(self.bm3.pose_body).detach().cpu().numpy()
+                    self.poseaamat[i, vp_id, ipol_id, :] = torch.squeeze(self.bm.pose_body).detach().cpu().numpy()
 
-                    points = self.bm3.forward().Jtr  # 55 joints ?
+                    points = self.bm.forward().Jtr  # 55 joints ?
 
-                    body_mesh = trimesh.Trimesh(vertices=c2c(self.bm3.forward().v)[0], faces=c2c(self.bm.f),
+                    body_mesh = trimesh.Trimesh(vertices=c2c(self.bm.forward().v)[0], faces=c2c(self.bm.f),
                                                 vertex_colors=np.tile([135, 250, 206],
-                                                                      (c2c(self.bm3.forward().v).shape[1], 1)))
+                                                                      (c2c(self.bm.forward().v).shape[1], 1)))
 
                     # Calculate and save kinematic 2D and 3D points
                     # This also changes 'body_mesh' in place - todo
@@ -243,12 +236,3 @@ if __name__ == "__main__":
     generator = GenerateVposerStimsViewpoint(_smpl_exp_dir, _bm_path, _out_dir, _device, poz_mat=poz_mat, uparam=poz_ids)
     generator.create_poses()
     generator.save_numpy_arrays()
-
-
-
-
-
-
-
-
-
