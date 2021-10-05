@@ -62,6 +62,49 @@ def perspective_projection(points, rotation, translation,
     return projected_points[:, :, :-1]
 
 
+def load_poz_stimuli_from_mat_file(mat_file_path: str) -> (np.array, np.array):
+    """
+    Load and stack the latent stimuli (poz) arrays of a matlab file.
+    """
+    mat_file = scipy.io.loadmat(mat_file_path)['body']
+    raw_stimuli = mat_file['param']
+    raw_ids = mat_file['uparam']
+
+    poz_ids = []
+    poz_stimuli = []
+    for i in range(0, len(raw_stimuli)):
+        poz_stimuli.append(raw_stimuli[i][0])
+        poz_ids.append(raw_ids[i][0])
+
+    return np.vstack(poz_ids), np.vstack(poz_stimuli)
+
+
+def generate_random_poz_stimuli(out_dir: str) -> np.array:
+    # Description of experiment parameter
+    stim_params = {
+        # Some arbitrary array that creates poses
+        'poz_sel_array': np.arange(32),
+        # The number of orthonormal basis we will create
+        # We will use each column of each basis as latent stimuli (poZ)
+        # Advantage of using ONB: we create stimuli in each latent direction
+        'num_onb': 6,
+        # Scaling of each orthonormal basis
+        # The higher the scaling, the more extreme the samples
+        # The latent space (poZ) is constructed by using centered normal distributions
+        'scale': [8, 8, 32, 32, 96, 96]
+    }
+
+    # Create orthonormal basis, scale it and use the columns to fill poz stimuli vector
+    poz_mat = np.zeros((stim_params['poz_sel_array'].shape[0] * stim_params['num_onb'], 32))
+    for i in range(stim_params['num_onb']):
+        x = rand_ndim_onb(stim_params['poz_sel_array'].shape[-1])
+        poz_mat[i * stim_params['poz_sel_array'].shape[-1]: (i + 1) * stim_params['poz_sel_array'].shape[0],
+                stim_params['poz_sel_array']] = x.transpose() * stim_params['scale'][i]
+
+    np.save(os.path.join(out_dir, 'stim_creation_params.npy'), stim_params)
+    return poz_mat
+
+
 class GenerateVposerStimsViewpoint:
     def __init__(self, smpl_exp_dir: str, bm_path: str, out_dir: str,
                  device: torch.device, poz_mat: np.array = None, uparam: np.array = None):
