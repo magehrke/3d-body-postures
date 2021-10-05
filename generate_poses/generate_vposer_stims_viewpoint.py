@@ -62,7 +62,14 @@ def perspective_projection(points, rotation, translation,
 
 
 class GenerateVposerStimsViewpoint:
-    def __init__(self, smpl_exp_dir: str, bm_path: str, out_dir: str, device: torch.device):
+    def __init__(self, smpl_exp_dir: str, bm_path: str, out_dir: str,
+                 device: torch.device, poz_mat: np.array = None, uparam: np.array = None):
+        """
+        :param poz_mat: Numpy array with the latent stimuli to create poses.
+            The array must have dimensions [X, 32]. If poz_mat is not given, then
+            random latent vectors and poses are created.
+        :param uparam: Unique ID's for each stimuli, which we add when saving data.
+        """
         self.smpl_exp_dir = smpl_exp_dir
         self.bm_path = bm_path
         self.out_dir = out_dir
@@ -80,25 +87,17 @@ class GenerateVposerStimsViewpoint:
         self.imw, self.imh = 400, 400
         self.fraction = 15
 
-        # Dimension array of the latent stimuli size
-        self.poz_dim_array = np.arange(32)
-        # The number of orthonormal basis we will create
-        # We will use each column of each basis as latent stimuli (poZ)
-        # Advantage of using ONB: we create stimuli in each latent direction
-        self.num_onb = 6
-        # Scaling of each orthonormal basis
-        # The higher the scaling, the more extreme the samples
-        # The latent space (poZ) is constructed by using centered normal distributions
-        self.scale = [8, 8, 32, 32, 96, 96]
-        # Number of latent stimuli (poZ)
-        self.n_stim = self.poz_dim_array.shape[0] * self.num_onb
+        if poz_mat is not None:
+            assert poz_mat.shape[1] == 32
+            self.poz_mat = poz_mat
+            assert uparam.shape[0] == poz_mat.shape[0]
+            self.uparam  = uparam
+        else:
+            self.poz_mat = generate_random_poz_stimuli(out_dir=self.out_dir)
+            self.uparam = None
 
-        # Create orthonormal basis, scale it and use the columns to fill poz stimuli vector
-        self.poz_mat = np.zeros((self.n_stim, 32))
-        for i in range(self.num_onb):
-            x = rand_ndim_onb(self.poz_dim_array.shape[-1])
-            self.poz_mat[i * self.poz_dim_array.shape[-1]: (i + 1) * self.poz_dim_array.shape[0], self.poz_dim_array] \
-                = x.transpose() * self.scale[i]
+        # Number of latent stimuli (poZ)
+        self.n_stim = self.poz_mat.shape[0]
 
         # Viewpoint
         self.num_vp = 3
@@ -237,8 +236,11 @@ if __name__ == "__main__":
 
     _device = torch.device('cuda')
 
+    # Get stimuli
+    poz_ids, poz_mat = load_poz_stimuli_from_mat_file('../data/VAEparams.mat')
+
     # Execute
-    generator = GenerateVposerStimsViewpoint(_smpl_exp_dir, _bm_path, _out_dir, _device)
+    generator = GenerateVposerStimsViewpoint(_smpl_exp_dir, _bm_path, _out_dir, _device, poz_mat=poz_mat, uparam=poz_ids)
     generator.create_poses()
     generator.save_numpy_arrays()
 
