@@ -13,6 +13,7 @@ from human_body_prior.tools.omni_tools import copy2cpu as c2c
 from human_body_prior.tools.omni_tools import id_generator, makepath
 from human_body_prior.tools.omni_tools import apply_mesh_tranfsormations_
 import generate_utils as g_utils
+import torchsummary
 
 
 def rand_ndim_onb(ndim):
@@ -126,6 +127,7 @@ class GenerateVposerStimsViewpoint:
 
         self.bm = BodyModelWithPoser(bm_path=bm_path, batch_size=1, model_type='smplx', poser_type='vposer',
                                      smpl_exp_dir=smpl_exp_dir).to('cuda')
+        torchsummary.summary(self.bm.poser_body_pt, (1, 63))
 
         self.num_interpol = 18
         self.view_angles = np.linspace(0, 2, num=self.num_interpol)
