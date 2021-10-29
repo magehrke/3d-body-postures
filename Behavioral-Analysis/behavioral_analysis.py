@@ -85,11 +85,9 @@ class BehavioralAnalysis:
                     hit = questions.str.contains(quest_dict['question'])
                     assert hit.sum() == 1
                     raw = df.loc[2:, hit]
+                    raw = raw.dropna()
                     raw = raw.apply(pd.to_numeric)
-                    raw = raw.replace([quest_dict['likert_str_min'], quest_dict['likert_min']])
-                    raw = raw.replace([quest_dict['likert_str_max'], quest_dict['likert_max']]).to_numpy()
-                    raw = raw[~pd.isnull(raw)]
-                    raw = raw.astype(np.int)
+                    raw = raw.to_numpy().flatten()
                     desc = {'mean': np.mean(raw), 'std': np.std(raw),
                             'median': np.median(raw), 'raw': raw, 'n': len(raw)}
                     uparam_stats[pose_name] = desc
@@ -141,7 +139,7 @@ class BehavioralAnalysis:
 
     def get_statistics_cat(self, quest_dict: dict):
         save_dir = f'stat_dics/{quest_dict["prefix"]}_dict.pkl'
-        if not os.path.exists(save_dir):
+        if os.path.exists(save_dir):
             with open(save_dir, "rb") as input_file:
                 stats = pickle.load(input_file)
         else:
@@ -155,15 +153,23 @@ class BehavioralAnalysis:
                     assert hit.sum() == 1
                     raw = df.loc[2:, hit]
                     raw = raw.dropna()
-                    raw = np.array(raw.iloc[:, 0].values.tolist())
-                    print(raw)
-                    raw = raw.astype(np.int)
-                    print(raw)
-                    for s, t in quest_dict['categories'].items():
-                        raw = np.where(raw == s, t, raw)
+                    _raw = raw.to_numpy().flatten()
+                    # If people clicked yes and chose an emotion
+                    # sometimes it is saved as '1,7'. So we have to
+                    # extract the emotion.
+                    raw = []
+                    for num in _raw:
+                        try:
+                            raw.append(int(num))
+                        except ValueError:
+                            assert type(num) == str
+                            num = num[num.rindex(',')+1:]  # TODO: last num?
+                            raw.append(int(num))
+                    raw = np.array(raw)
                     raw = Counter(raw)
-                    print(raw)
-                    desc = {}
+                    desc = {
+                        'raw': raw
+                    }
                     uparam_stats[pose_name] = desc
                 stats[uparam_name] = uparam_stats
             with open(save_dir, "wb") as output_file:
@@ -188,7 +194,7 @@ if __name__ == "__main__":
         },
         'prefix': 'daily'
     }
-    #daily_stats = ba.get_statistics_cat(daily_desc)
+    daily_stats = ba.get_statistics_cat(daily_desc)
     #ba.create_boxplots(desc=daily_desc, stats=daily_stats)
     # EMOTION
     # Question type: yes/no
@@ -201,9 +207,11 @@ if __name__ == "__main__":
         },
         'prefix': 'emo'
     }
-    #emo_stats = ba.get_statistics_cat(emo_desc)
+    emo_stats = ba.get_statistics_cat(emo_desc)
     #ba.create_boxplots(desc=emo_desc, stats=emo_stats)
 
+
+    sys.exit()
 
     # AROUSAL
     # (Boring, 2, 3, 4, Arousing)
