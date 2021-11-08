@@ -2,10 +2,13 @@ import sys
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
+from scipy.stats import norm
 from tqdm import tqdm
 import os
 import pickle
 from collections import Counter
+
 
 
 """
@@ -16,7 +19,7 @@ from collections import Counter
 
 class BehavioralAnalysis:
     def __init__(self):
-        self.dpi = 50
+        self.dpi = 200
 
         df = pd.read_csv(f'Questionnaire.csv')
         print(f'Original DF shape: {df.shape}')
@@ -30,6 +33,7 @@ class BehavioralAnalysis:
         # Drop unfinished observations
         df = df[df['Finished'] != '0']
         print(f'DF shape after dropping: {df.shape}')
+        print(f'Number of Subjects: {df.shape[0] - 2}')
         c_names = df.columns.values
 
         # Load file containing which question belongs to which pose
@@ -47,7 +51,7 @@ class BehavioralAnalysis:
         self.scale = {}
         for un in uparam_names:
             for stim in p_items_lst.keys():
-                if stim.startswith(un):
+                if stim.startswith(f'{un}_'):
                     self.scale[un] = stim[stim.find('scale') + 6:]
 
         # Extract only those items that are in the df
@@ -117,25 +121,65 @@ class BehavioralAnalysis:
                         dpi=self.dpi, bbox_inches='tight')
             plt.close()
 
-    def create_boxplots(self, desc: dict, stats: dict):
+    def create_boxplots(self, desc: dict, stats: dict, only_hist=False):
         loop_desc = f'Creating {desc["prefix"]} boxplots'
         save_dir = f'boxplots/{desc["prefix"]}'
         if not os.path.exists(save_dir):
             os.mkdir(save_dir)
+
+        scatter_data = []
         for uparam, dfs_of_vps in tqdm(stats.items(), loop_desc):
             raw_all = []
             for i, (pose_name, vp_dict) in enumerate(dfs_of_vps.items()):
                 raw_all.extend(vp_dict['raw'])
+            scatter_data.append(np.mean(raw_all))
+            if not only_hist:
+                fig, ax = plt.subplots(1, 2)
+                fig.suptitle(f'{uparam} (Scale = {self.scale[uparam]})')
 
-            plt.boxplot(raw_all)
-            plt.title(f'{uparam} (Scale = {self.scale[uparam]})')
-            plt.ylim((desc['likert_min'] - 1, desc['likert_max'] + 1))
-            plt.yticks(range(desc['likert_min'], desc['likert_max'] + 1),
-                       range(desc['likert_min'],  desc['likert_max'] + 1))
-            plt.ylabel('Likert Scale')
-            plt.savefig(f'{save_dir}/{uparam}_scale_{self.scale[uparam]}',
-                        dpi=self.dpi, bbox_inches='tight')
-            plt.close()
+                ax[0].boxplot(raw_all, positions=[0])
+                ax[0].plot([0], np.mean(raw_all), '+', label='Mean')
+                ax[0].set_ylim((desc['likert_min'] - 1, desc['likert_max'] + 1))
+                ax[0].set_yticks(range(desc['likert_min'], desc['likert_max'] + 1))
+                ax[0].set_yticklabels(range(desc['likert_min'],
+                                            desc['likert_max'] + 1))
+                ax[0].set_ylabel(f'{desc["likert_str_min"]}     =>     '
+                                 f'{desc["likert_str_max"]}')
+                ax[0].tick_params(labelbottom=False, bottom=False)
+                ax[0].legend(frameon=False)
+
+                im = mpimg.imread(f'Stim_images/{uparam}_Viewpoint_2_scale_'
+                                  f'{self.scale[uparam]}.png')
+                ax[1].set_title('Viewpoint 2')
+                ax[1].tick_params(left=False, labelleft=False,
+                                  labelbottom=False, bottom=False)
+                ax[1].imshow(im)
+
+                strt = int(np.floor(np.mean(raw_all)))
+                subfolder = f'{save_dir}/{strt}-{strt+1}'
+                if not os.path.exists(subfolder):
+                    os.mkdir(subfolder)
+                plt.savefig(f'{subfolder}/{uparam}_scale_{self.scale[uparam]}',
+                            dpi=self.dpi, bbox_inches='tight')
+                plt.close()
+
+        # Plot histogram of the posture means (incl. normal)
+        plt.hist(scatter_data, bins=15, density=True)
+        plt.xlabel(f'{desc["likert_str_min"]}     =>     '
+                   f'{desc["likert_str_max"]}')
+        plt.xlim((desc['likert_min'] - 1, desc['likert_max'] + 1))
+        plt.xticks(range(desc['likert_min'], desc['likert_max'] + 1),
+                   range(desc['likert_min'], desc['likert_max'] + 1))
+        mu, std = norm.fit(scatter_data)
+        xmin, xmax = plt.xlim()
+        x = np.linspace(xmin, xmax, 100)
+        p = norm.pdf(x, mu, std)
+        plt.plot(x, p, 'k', linewidth=2,
+                 label=f'mu = {round(mu, 2)}, std = {round(std, 2)}')
+        plt.legend()
+        plt.savefig(f'{save_dir}/{desc["prefix"]}_hist',
+                    dpi=self.dpi, bbox_inches='tight')
+        plt.close()
 
     def get_statistics_cat(self, quest_dict: dict):
         save_dir = f'stat_dics/{quest_dict["prefix"]}_dict.pkl'
@@ -166,7 +210,6 @@ class BehavioralAnalysis:
                             num = num[num.rindex(',')+1:]  # TODO: last num?
                             raw.append(int(num))
                     raw = np.array(raw)
-                    raw = Counter(raw)
                     desc = {
                         'raw': raw
                     }
@@ -176,7 +219,59 @@ class BehavioralAnalysis:
                 pickle.dump(stats, output_file)
         return stats
 
+    def barplot_cat(self, desc: dict, stats, hist_only=False):
+        loop_desc = f'Creating {desc["prefix"]} barplots'
+        save_dir = f'barplots/{desc["prefix"]}'
+        if not os.path.exists(save_dir):
+            os.mkdir(save_dir)
 
+        hist_data = []
+        for uparam, dfs_of_vps in tqdm(stats.items(), loop_desc):
+            raw_all = []
+            for i, (pose_name, vp_dict) in enumerate(dfs_of_vps.items()):
+                raw_all.extend(vp_dict['raw'])
+            count = Counter(raw_all)
+            names = list(desc['categories'].values())
+            keys = list(desc['categories'].keys())
+            values = [0] * len(keys)
+            for k, v in count.items():
+                ind = keys.index(k)
+                values[ind] = v
+            max_ind = int(np.argmax(values))
+            max_name = names[max_ind]
+            hist_data.append(max_name)
+            if not hist_only:
+                fig, ax = plt.subplots(1, 2, gridspec_kw={'width_ratios': [2, 1]})
+                fig.suptitle(f'{uparam} (Scale = {self.scale[uparam]})')
+
+                ax[0].bar(names, values)
+                ax[0].tick_params(labelrotation=45)
+
+                im = mpimg.imread(f'Stim_images/{uparam}_Viewpoint_2_scale_'
+                                  f'{self.scale[uparam]}.png')
+                ax[1].set_title('Viewpoint 2')
+                ax[1].tick_params(left=False, labelleft=False,
+                                  labelbottom=False, bottom=False)
+                ax[1].imshow(im)
+
+                if not os.path.exists(f'{save_dir}/{max_name}'):
+                   os.mkdir(f'{save_dir}/{max_name}')
+                plt.savefig(f'{save_dir}/{max_name}/{uparam}_scale_{self.scale[uparam]}',
+                            dpi=self.dpi, bbox_inches='tight')
+                plt.close()
+        # Histogram of max categories
+        hist_count = Counter(hist_data)
+        keys = (hist_count.keys())
+        values = list(hist_count.values())
+        # - Add labels on top of bars
+        bars = range(0, len(values)+1)
+        plt.bar(keys, values)
+        plt.xticks(rotation=45)
+        for i in range(len(values)):
+            plt.annotate(str(values[i]), xy=(bars[i], values[i]), ha='center', va='bottom')
+        plt.savefig(f'{save_dir}/{desc["prefix"]}_bar',
+                    dpi=self.dpi, bbox_inches='tight')
+        plt.close()
 
 if __name__ == "__main__":
 
@@ -184,18 +279,6 @@ if __name__ == "__main__":
 
     # ===== HIGH LEVEL FEATURES - EMOTION ====== #
 
-    # DAILY ACTION
-    # Question type: yes/no + choice if yes
-    daily_desc = {
-        'question': f'Can you recognize a daily action in the posture?',
-        'categories': {  # From Questionaire -> question -> recode values
-            1: 'Yes', 2: 'No', 3: 'Greeting a person', 4: 'Grasping an object',
-            5: 'Catching an object', 6: 'Self-Defending', 7: 'None of the above'
-        },
-        'prefix': 'daily'
-    }
-    daily_stats = ba.get_statistics_cat(daily_desc)
-    #ba.create_boxplots(desc=daily_desc, stats=daily_stats)
     # EMOTION
     # Question type: yes/no
     # Possibilities if yes: Sadness, Happiness, Fear, Disgust, Anger, Surprise
@@ -205,33 +288,38 @@ if __name__ == "__main__":
             9: 'Yes', 8: 'No', 16: 'Sadness', 17: 'Happiness', 18: 'Fear',
             19: 'Disgust', 20: 'Anger', 21: 'Surprise'
         },
-        'prefix': 'emo'
+        'prefix': 'emotion'
     }
     emo_stats = ba.get_statistics_cat(emo_desc)
-    #ba.create_boxplots(desc=emo_desc, stats=emo_stats)
 
-
-    sys.exit()
+    # BODY PART
+    body_desc = {
+        'question': f'Which body part did you mostly look at?',
+        'categories': {
+            1: 'Head', 2: 'Hands', 3: 'Arms', 4: 'Legs', 5: 'Feet',
+            6: 'Overall'
+        },
+        'prefix': 'bodypart'
+    }
+    body_stats = ba.get_statistics_cat(body_desc)
 
     # AROUSAL
     # (Boring, 2, 3, 4, Arousing)
     arou_desc = {
         'question': f'Do you feel this posture arousing or rather boring?',
         'likert_min': 1, 'likert_max': 5, 'likert_str_min': 'Boring',
-        'likert_str_max': 'Arousing', 'prefix': 'arou'
+        'likert_str_max': 'Arousing', 'prefix': 'arousal'
     }
     arou_stats = ba.get_statistics(arou_desc)
-    #ba.create_boxplots(desc=arou_desc, stats=arou_stats)
 
     # POSITIVITY
     # (Very negative, 2, 3, 4, Very positive)
     pos_desc = {
         'question': f'Do you feel this posture is\npositive or rather negative?',
         'likert_min': 1, 'likert_max': 5, 'likert_str_min': 'Very negative',
-        'likert_str_max': 'Very positive', 'prefix': 'pos'
+        'likert_str_max': 'Very positive', 'prefix': 'positivity'
     }
     pos_stats = ba.get_statistics(pos_desc)
-    #ba.create_boxplots(desc=pos_desc, stats=pos_stats)
 
     # ===== HIGH LEVEL FEATURES - ACTION ====== #
 
@@ -240,20 +328,30 @@ if __name__ == "__main__":
     fam_desc = {
         'question': f'Is this posture familiar to you?', 'likert_min': 1,
         'likert_max': 5, 'likert_str_min': 'Very unfamiliar',
-        'likert_str_max': 'Very familiar', 'prefix': 'fam'
+        'likert_str_max': 'Very familiar', 'prefix': 'familiarity'
     }
     fam_stats = ba.get_statistics(fam_desc)
-    ba.create_boxplots(desc=fam_desc, stats=fam_stats)
 
     # REALISM
     # (Very unrealistic, 2, 3, 4, Very realistic)
     real_desc = {
         'question': f'Is this a realistic body posture you can make yourself',
         'likert_min': 1, 'likert_max': 5, 'likert_str_min': 'Very unrealistic',
-        'likert_str_max': 'Very realistic', 'prefix': 'real'
+        'likert_str_max': 'Very realistic', 'prefix': 'realism'
     }
     real_stats = ba.get_statistics(real_desc)
-    # ba.create_boxplots(desc=real_desc, stats=real_stats)
+
+    # DAILY ACTION
+    # Question type: yes/no + choice if yes
+    daily_desc = {
+        'question': f'Can you recognize a daily action in the posture?',
+        'categories': {  # From Questionaire -> question -> recode values
+            1: 'Yes', 2: 'No', 3: 'Greeting a person', 4: 'Grasping an object',
+            5: 'Catching an object', 6: 'Self-Defending', 7: 'None of the above'
+        },
+        'prefix': 'dailyaction'
+    }
+    daily_stats = ba.get_statistics_cat(daily_desc)
 
     # POSSIBILITY
     # (Possible, 2, 3, 4, Impossible)
@@ -261,10 +359,9 @@ if __name__ == "__main__":
         'question': f'Is it possible for any of the body parts to be in this',
         'likert_min': 1, 'likert_max': 5,
         'likert_str_min': 'Possible', 'likert_str_max': 'Impossible',
-        'prefix': 'poss'
+        'prefix': 'possibility'
     }
     poss_stats = ba.get_statistics(poss_desc)
-    # ba.create_boxplots(desc=poss_desc, stats=poss_stats)
 
     # ===== MID LEVEL FEATURES - MOVEMENT CHARACTERISTICS ====== #
 
@@ -274,10 +371,9 @@ if __name__ == "__main__":
         'question': f'How much overall body movement is implied in the posture?',
         'likert_min': 1, 'likert_max': 5,
         'likert_str_min': 'Little movement', 'likert_str_max': 'A lot of movement',
-        'prefix': 'mov'
+        'prefix': 'movement'
     }
     mov_stats = ba.get_statistics(mov_desc)
-    ba.create_boxplots(desc=mov_desc, stats=mov_stats)
 
     # CONTRACTION
     # (Little contraction, 2, 3, 4, A lot of contraction)
@@ -285,7 +381,19 @@ if __name__ == "__main__":
         'question': f'How much body contraction is there in the body posture?',
         'likert_min': 1, 'likert_max': 5,
         'likert_str_min': 'Little contraction', 'likert_str_max': 'A lot of contraction',
-        'prefix': 'cont'
+        'prefix': 'contraction'
     }
     cont_stats = ba.get_statistics(cont_desc)
-    ba.create_boxplots(desc=cont_desc, stats=cont_stats)
+
+    # COMPUTE STUFF
+    ba.barplot_cat(desc=daily_desc, stats=daily_stats, hist_only=False)
+    ba.barplot_cat(desc=emo_desc, stats=emo_stats, hist_only=False)
+    ba.barplot_cat(desc=body_desc, stats=body_stats, hist_only=False)
+    ba.create_boxplots(desc=arou_desc, stats=arou_stats, only_hist=False)
+    ba.create_boxplots(desc=pos_desc, stats=pos_stats)
+    ba.create_boxplots(desc=fam_desc, stats=fam_stats)
+    ba.create_boxplots(desc=real_desc, stats=real_stats)
+    ba.create_boxplots(desc=poss_desc, stats=poss_stats, only_hist=False)
+    ba.create_boxplots(desc=mov_desc, stats=mov_stats, only_hist=False)
+    ba.create_boxplots(desc=cont_desc, stats=cont_stats, only_hist=False)
+
