@@ -6,6 +6,15 @@ from human_body_prior.tools.omni_tools import makepath
 
 
 def compare_stims(original_dir: str, reconstructed_dir: str, out_dir: str) -> None:
+    """
+    Compare original and reconstructed images. First compare the average hash
+    difference and print a warning if it varies too much, and second save a new
+    image, showing both images side by side.
+
+    :param original_dir: path of original images
+    :param reconstructed_dir: path of reconstructed images
+    :param str out_dir: path for new (side by side) png images
+    """
     orig_files = glob.glob(os.path.join(original_dir, f'*'))
 
     for f in orig_files:
