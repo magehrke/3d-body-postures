@@ -14,6 +14,7 @@ pytorch3d
 torchgeometry
 scipy
 imagehash
+torchsummary
 
 # From body_visualiser package
 opencv-python

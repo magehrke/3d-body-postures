@@ -321,12 +321,21 @@ if __name__ == "__main__":
     makepath(os.path.join(_out_dir, 'png'))
     print(f'Output directory: {_out_dir}')
 
+    # Use CUDA if you have a GPU (preferred!)
     _device = torch.device('cuda')
 
-    # Get stimuli
-    poz_ids, poz_mat = load_poz_stimuli_from_mat_file('../data/VAEparams.mat')
+    # Load poses from matlab file that have already been created (vs. create new)
+    # This makes sense, when we want to reconstruct the stimuli and check e.g. activations
+    load_poses = False
+
+    if load_poses:
+        # Get stimuli
+        poz_ids, poz_mat = load_poz_stimuli_from_mat_file('../data/VAEparams.mat')
+        generator = GenerateVposerStimsViewpoint(_smpl_exp_dir, _bm_path, _out_dir, _device,
+                                                 poz_mat=poz_mat, uparam=poz_ids)
+    else:
+        generator = GenerateVposerStimsViewpoint(_smpl_exp_dir, _bm_path, _out_dir, _device)
 
     # Execute
-    generator = GenerateVposerStimsViewpoint(_smpl_exp_dir, _bm_path, _out_dir, _device, poz_mat=poz_mat, uparam=poz_ids)
     generator.create_poses()
     generator.save_numpy_arrays()
