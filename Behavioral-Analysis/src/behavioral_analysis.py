@@ -79,7 +79,7 @@ class BehavioralAnalysis:
             self.uparam_dict[sn] = viewpoint_dict
 
     def get_statistics(self, quest_dict: dict):
-        save_dir = f'data/stat_dics/{quest_dict["prefix"]}_dict.pkl'
+        save_dir = f'output/stat_dics/{quest_dict["prefix"]}_dict.pkl'
         if os.path.exists(save_dir):
             with open(save_dir, "rb") as input_file:
                 stats = pickle.load(input_file)
@@ -203,7 +203,7 @@ class BehavioralAnalysis:
         out_file.close()
 
     def get_statistics_cat(self, quest_dict: dict):
-        save_dir = f'data/stat_dics/{quest_dict["prefix"]}_dict.pkl'
+        save_dir = f'output/stat_dics/{quest_dict["prefix"]}_dict.pkl'
         if os.path.exists(save_dir):
             with open(save_dir, "rb") as input_file:
                 stats = pickle.load(input_file)
