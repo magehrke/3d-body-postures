@@ -6,6 +6,8 @@ import numpy as np
     Author: MA Gehrke
     Date: 08.02.2022
     
+    Attention: Only needed for Behavioral Analysis 1!
+    
     The question IDs of the first behavioral analysis
     need to be associated with the stimuli (image) that
     has been shown to the participant. We do this by examining
@@ -19,7 +21,7 @@ import numpy as np
 """
 
 
-def associate_items_to_poses():
+def associate_items_to_poses() -> None:
     with open('../input/behavioral_analysis_1/Questionnaire_3D_body_postures.txt') as f:
         txt = f.read()
 
