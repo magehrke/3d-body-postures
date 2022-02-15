@@ -15,18 +15,14 @@ from collections import Counter
     Author: MA Gehrke
     Date: 08.02.2022
 
-    Analyse the data of the bahavioral analysis of the
-    3D body posture questionnaire, including bar- & boxplots.
-    
-    Before any analysis can be done, the data needs to be down-
-    loaded from qualtrics. Go to Data & Analyses -> Export & Import 
-    -> Export Data... -> CSV, tick 'Download all fields' and 'Use
-    numeric values', and press Download.
+    This class loads the data in form of arrays from 
+    the hard drive and processes it to plot bar-
+    and boxplots.
 """
 
 
 class BehavioralAnalysis:
-    def __init__(self, ba_number: str):
+    def __init__(self, ba_numbers: [str]):
         """
         Class for executing statistical calculations on the data of the
         first, the second or both behavioral analyses.
@@ -37,9 +33,10 @@ class BehavioralAnalysis:
         :param ba_number: chooses the data that will be used. Either from
             the first behavioral analysis, the second or all the data together.
         """
-        self.ba_number = ba_number
-        assert ba_number in ['1', '2', 'all']
-        print(f'Behavioral analysis set to \'{ba_number}\'!')
+        self.ba_numbers = ba_numbers
+        for n in ba_numbers:
+            assert n in ['1', '2', 'all']
+        print(f'Calculating plots for {ba_numbers}!')
 
         self.out_dir = {
             '1': f'../output/behavioral_analysis_1/',
@@ -78,6 +75,7 @@ class BehavioralAnalysis:
                 stats = pickle.load(input_file)
                 return stats
 
+    # Not used
     def create_boxplots_vp(self, desc: dict, stats: dict):
         loop_desc = f'Creating {desc["prefix"]} boxplots'
         save_dir = f'boxplots-vp/{desc["prefix"]}'
@@ -99,15 +97,21 @@ class BehavioralAnalysis:
                         dpi=self.dpi, bbox_inches='tight')
             plt.close()
 
-    def create_boxplots(self, desc: dict, stats: dict, only_hist=False):
-        if stats:
-            loop_desc = f'Creating {desc["prefix"]} boxplots'
-            save_dir = f'{self.out_dir}boxplots/{desc["prefix"]}'
+    def create_boxplots(self, question: dict, only_hist=False):
+        """
+        TODO
+        """
+        for ba_num in self.get_loops(question):
+            save_dir = f'{self.out_dir[ba_num]}boxplots/{question["prefix"]}'
             if not os.path.exists(save_dir):
                 os.makedirs(save_dir)
 
+            stats = self.load_statistics(question, ba_num)
+
             scatter_data = []
+            loop_desc = f'Creating {question["prefix"]} boxplots (BA {ba_num})'
             for uparam, dfs_of_vps in tqdm(stats.items(), loop_desc):
+                # sum over viewpoints
                 raw_all = []
                 for i, (pose_name, vp_dict) in enumerate(dfs_of_vps.items()):
                     raw_all.extend(vp_dict['raw'])
@@ -118,16 +122,16 @@ class BehavioralAnalysis:
 
                     ax[0].boxplot(raw_all, positions=[0])
                     ax[0].plot([0], np.mean(raw_all), '+', label='Mean')
-                    ax[0].set_ylim((desc['likert_min'] - 1, desc['likert_max'] + 1))
-                    ax[0].set_yticks(range(desc['likert_min'], desc['likert_max'] + 1))
-                    ax[0].set_yticklabels(range(desc['likert_min'],
-                                                desc['likert_max'] + 1))
-                    ax[0].set_ylabel(f'{desc["likert_str_min"]}     =>     '
-                                     f'{desc["likert_str_max"]}')
+                    ax[0].set_ylim((question['likert_min'] - 1, question['likert_max'] + 1))
+                    ax[0].set_yticks(range(question['likert_min'], question['likert_max'] + 1))
+                    ax[0].set_yticklabels(range(question['likert_min'],
+                                                question['likert_max'] + 1))
+                    ax[0].set_ylabel(f'{question["likert_str_min"]}     =>     '
+                                     f'{question["likert_str_max"]}')
                     ax[0].tick_params(labelbottom=False, bottom=False)
                     ax[0].legend(frameon=False)
 
-                    im = mpimg.imread(f'Stim_images/{uparam}_Viewpoint_2_scale_'
+                    im = mpimg.imread(f'../input/stim_images/{uparam}_Viewpoint_2_scale_'
                                       f'{self.scale[uparam]}.png')
                     ax[1].set_title('Viewpoint 2')
                     ax[1].tick_params(left=False, labelleft=False,
@@ -149,11 +153,11 @@ class BehavioralAnalysis:
 
             # Plot histogram of the posture means (incl. normal)
             plt.hist(float_value_arr, bins=15, density=True)
-            plt.xlabel(f'{desc["likert_str_min"]}     =>     '
-                       f'{desc["likert_str_max"]}')
-            plt.xlim((desc['likert_min'] - 1, desc['likert_max'] + 1))
-            plt.xticks(range(desc['likert_min'], desc['likert_max'] + 1),
-                       range(desc['likert_min'], desc['likert_max'] + 1))
+            plt.xlabel(f'{question["likert_str_min"]}     =>     '
+                       f'{question["likert_str_max"]}')
+            plt.xlim((question['likert_min'] - 1, question['likert_max'] + 1))
+            plt.xticks(range(question['likert_min'], question['likert_max'] + 1),
+                       range(question['likert_min'], question['likert_max'] + 1))
             mu, std = norm.fit(float_value_arr)
             xmin, xmax = plt.xlim()
             x = np.linspace(xmin, xmax, 100)
@@ -161,15 +165,15 @@ class BehavioralAnalysis:
             plt.plot(x, p, 'k', linewidth=2,
                      label=f'mu = {round(mu, 2)}, std = {round(std, 2)}')
             plt.legend()
-            plt.savefig(f'{save_dir}/{desc["prefix"]}_hist',
+            plt.savefig(f'{save_dir}/{question["prefix"]}_hist',
                         dpi=self.dpi, bbox_inches='tight')
             plt.close()
 
             # Print & export overview of values
-            out_file = open(f'{save_dir}/{desc["prefix"]}_values.txt', 'w')
-            out_file.write(f'Stimuli, {desc["likert_str_min"]} '
-                           f'({desc["likert_min"]}) => {desc["likert_str_max"]}'
-                           f'({desc["likert_max"]})\n\n')
+            out_file = open(f'{save_dir}/{question["prefix"]}_values.txt', 'w')
+            out_file.write(f'Stimuli, {question["likert_str_min"]} '
+                           f'({question["likert_min"]}) => {question["likert_str_max"]}'
+                           f'({question["likert_max"]})\n\n')
             for i in range(len(scatter_data[0])):
                 out_file.write(f'{format(scatter_data[0][i] + ",", " <22")}'
                                f'{round(float(scatter_data[1][i]), 2)}\n')
@@ -178,11 +182,7 @@ class BehavioralAnalysis:
             out_file.close()
 
     def barplot(self, question: dict, hist_only=False):
-        loop_desc = f'Creating {question["prefix"]} barplots'
-        quest_ba_type = question['behavioral_analysis']
-        if 'all' in self.ba_number and 2 in quest_ba_type:
-            quest_ba_type.append('all')
-        for ba_num in quest_ba_type:
+        for ba_num in self.get_loops(question):
             ba_num = str(ba_num)
             save_dir = f'{self.out_dir[ba_num]}barplots/{question["prefix"]}'
             if not os.path.exists(save_dir):
@@ -191,6 +191,7 @@ class BehavioralAnalysis:
             stats = self.load_statistics(question, ba_num)
 
             hist_data = []
+            loop_desc = f'Creating {question["prefix"]} barplots (BA {ba_num})'
             for uparam, dfs_of_vps in tqdm(stats.items(), loop_desc):
                 raw_all = []
                 for i, (pose_name, vp_dict) in enumerate(dfs_of_vps.items()):
@@ -238,5 +239,17 @@ class BehavioralAnalysis:
                         dpi=self.dpi, bbox_inches='tight')
             plt.close()
 
+    def get_loops(self, question: dict):
+        # Check BA's we want to calculate plots for
+        quest_ba_type = question['behavioral_analysis']
+        ba_for_quest = []
+        for i in self.ba_numbers:
+            if i == 'all':
+                if 2 in quest_ba_type:
+                    ba_for_quest.append(i)
+            elif int(i) in quest_ba_type:
+                ba_for_quest.append(i)
+
+        return ba_for_quest
 
 

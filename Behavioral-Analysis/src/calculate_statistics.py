@@ -5,17 +5,17 @@ import pickle
 from tqdm import tqdm
 
 
-def calculate_statistics(questions: [dict]) -> None:
+def calculate_statistics(questions: [dict], force: bool = False) -> None:
     print(f'--- CALCULATING STATISTICS ---')
     # --- BEHAVIORAL ANALYSIS 1 ---
 
-    uparam_dict_1 = stats_ba_1()
-    uparam_dict_2 = stats_ba_2()
+    uparam_dict_1 = get_uparams_ba_1()
+    uparam_dict_2 = get_uparams_ba_2()
 
-    calc_quest_stats(questions, uparam_dict_1, uparam_dict_2)
+    calculate_stats_per_question(questions, uparam_dict_1, uparam_dict_2, force)
 
 
-def stats_ba_1():
+def get_uparams_ba_1():
     # Get data
     df = pd.read_csv(f'../input/behavioral_analysis_1/Questionnaire.csv')
     print(f'Original DF shape: {df.shape}')
@@ -67,7 +67,7 @@ def stats_ba_1():
     return uparam_dict
 
 
-def stats_ba_2():
+def get_uparams_ba_2():
     # Get data
     df = pd.read_csv(f'../input/behavioral_analysis_2/Questionnaire.csv')
     print(f'Original DF shape: {df.shape}')
@@ -118,7 +118,7 @@ def stats_ba_2():
     return uparam_dict
 
 
-def calc_quest_stats(questions: [dict], uparam_dict_1, uparam_dict_2) -> dict:
+def calculate_stats_per_question(questions: [dict], uparam_dict_1, uparam_dict_2, force) -> dict:
     """
     Load or calculate the statistics (mean, median, std, n or raw data values) for a question
     for each pose over all participants. Viewpoints of the same pose are stored together under
@@ -127,7 +127,8 @@ def calc_quest_stats(questions: [dict], uparam_dict_1, uparam_dict_2) -> dict:
     We differentiate between a likert and a categorical question type, where the latter
     had several answers to choose from.
 
-    :param quest_dict: dictionary containing the information of a question
+    :param questions: dictionary containing the information of a question
+    :param force: if this variable is true, we do a new calculation and overwrite old stats on disk
     :return: dictionary with the uparam name as key and a dictionary, containing statistics, as value
     """
     if not os.path.exists(f'../output/behavioral_analysis_1/stat_dicts/'):
@@ -140,7 +141,7 @@ def calc_quest_stats(questions: [dict], uparam_dict_1, uparam_dict_2) -> dict:
             out_dir = f'../output/behavioral_analysis_{ba_num}/'
             save_dir = f'{out_dir}stat_dicts/{quest_dict["prefix"]}_dict.pkl'
 
-            if not os.path.exists(save_dir):
+            if not os.path.exists(save_dir) or force:
                 if ba_num == 1:
                     uparam_dict = uparam_dict_1
                 else:
@@ -181,7 +182,7 @@ def calc_quest_stats(questions: [dict], uparam_dict_1, uparam_dict_2) -> dict:
                 with open(save_dir, "wb") as output_file:
                     pickle.dump(stats, output_file)
 
-    # CALCULATE STATS FOR ALL TOGETHER
+    # --- CALCULATE STATS FOR WITH ALL (BOTH) Behavioral Analysis Together --- #
     if not os.path.exists(f'../output/all/stat_dicts/'):
         os.makedirs(f'../output/all/stat_dicts/')
 
@@ -201,7 +202,7 @@ def calc_quest_stats(questions: [dict], uparam_dict_1, uparam_dict_2) -> dict:
                 for pose_name in uparam_1:
                     raw_1 = uparam_1[pose_name]['raw']
                     raw_2 = uparam_2[pose_name]['raw']
-                    # Flip likert scale for possibility question
+                    # Flip likert scale for possibility question in the first analysis
                     if q_name == 'possibility':
                         raw_1 = np.flip(raw_1)
                     desc = {'raw': np.concatenate((raw_1, raw_2))}
