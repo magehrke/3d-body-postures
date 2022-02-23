@@ -175,7 +175,7 @@ class BehavioralAnalysis:
                            f'({question["likert_min"]}) => {question["likert_str_max"]}'
                            f'({question["likert_max"]})\n\n')
             for i in range(len(scatter_data[0])):
-                out_file.write(f'{format(scatter_data[0][i] + ",", " <22")}'
+                out_file.write(f'{format(scatter_data[0][i] + " (" + self.scale[scatter_data[0][i]] + "),", " <30")}'
                                f'{round(float(scatter_data[1][i]), 2)}\n')
                 if i % 10 == 9:
                     out_file.write('\n')

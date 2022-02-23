@@ -15,12 +15,27 @@ from scipy import stats
 from sklearn.metrics import r2_score
 import numpy.matlib as mat
 from pathlib import Path
+import logging
 
 """
 Created on Fri Jul  2 15:29:33 2021
 
 @author: G.Marrazzo
 """
+
+
+def setup_logger(data_folder: Path) -> None:
+    logging.basicConfig(filename=data_folder / f'body_posture.log', format='%(asctime)s %(message)s',
+                        encoding='utf-8', level=logging.DEBUG)
+    # define a Handler which writes INFO messages or higher to the sys.stderr
+    console = logging.StreamHandler()
+    console.setLevel(logging.INFO)
+    # add the handler to the root logger
+    logging.getLogger().addHandler(console)
+
+
+def print_and_log(message: str):
+    print(message)
 
 
 def plot_figures(fit_banded_polar, Yhat) -> None:
@@ -37,66 +52,61 @@ def plot_figures(fit_banded_polar, Yhat) -> None:
     # ax.plot(fit_banded_polar['predictions'][:,0],Yhat[:,0],'o' );
     ax.plot(fit_banded_polar['predictions'][:, 0], Yhat[:, 0], 'o')
     plt.title('voxel1 predictions [X1 X2]', fontsize=10)
-    plt.show()
+    #plt.show()
     plt.plot(stats.zscore(fit_banded_polar['predictions'][:, 0]))
     plt.plot(stats.zscore(Yhat[:, 0]))
-    plt.show()
+    #plt.show()
 
 
 data_folder = Path("../data/Main_effect")
+#setup_logger(data_folder)
+
 name = ["_data_python.mat"]
-mod_name = ["_data_python_transform_0.mat"]
-subj = ["S5", "S6", "S7", "S8", "S9", "S10", "S11", "S13", "S14"]
-# subj = ["S5"]
+mod_suffix = "_data_python_transform_0.mat"
+subj = ["S9", "S10", "S11", "S13", "S14"]
 model = ["kp2d", "kp3d", "gabor", "VAE_enc", "VAEparam", "VAE_dec"]
 # model = ["kp3d","kp2d","gabor"]
 # model = ["VAE_enc_L1","VAE_enc_L2","VAE_enc","VAE_dec_L1","VAE_dec_L2","VAE_dec","VAEparam"]
 
-mod_ind = np.asarray([[0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [1, 2], [1, 3], [1, 4], [1, 5], [2, 3], [2, 4], [2, 5], [1, 4], [3, 4], [3, 5], [4, 5]])
-# mod_ind = np.asarray([[1,2]])
-# mod_ind = np.asarray([[0,6],[1,6],[2,6],[3,6],[4,6],[5,6],[0,1],[0,2],[1,2],[3,4],[3,5],[4,5],[2,5]])
-#data3 = mat73.loadmat('hrf.mat')
-#hrf = np.asarray(data3['hrf'])
+mod_ind = np.asarray([[0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [1, 2], [1, 3], [1, 4], [1, 5], [2, 3], [2, 4], [2, 5], [3, 4], [3, 5], [4, 5]])
+data3 = mat73.loadmat('../data/hrf.mat')
+hrf = np.asarray(data3['hrf'])
 
 for s in subj:
-    string_data = s + name[0]
-    file_data = data_folder / string_data
-    print(s + name[0])
-    data4 = mat73.loadmat(file_data)
+    subject_file_path = s + name[0]
+    print_and_log(f'=================================================')
+    print_and_log(f'Starting calculations on subject {s} ({subject_file_path})')
+    subject_data = data_folder / subject_file_path
+    subj_data = mat73.loadmat(subject_data)
 
-    for mod in range(mod_ind.shape[0]):
-
-        string_mod1 = model[mod_ind[mod][0]] + mod_name[0]
-        string_mod2 = model[mod_ind[mod][1]] + mod_name[0]
-        file_mod1 = data_folder / string_mod1
-        file_mod2 = data_folder / string_mod2
-        print(model[mod_ind[mod][0]] + " " + model[mod_ind[mod][1]])
-
+    for mod_i in range(mod_ind.shape[0]):
+        # Load model data
+        file_mod1 = data_folder / (model[mod_ind[mod_i][0]] + mod_suffix)
+        file_mod2 = data_folder / (model[mod_ind[mod_i][1]] + mod_suffix)
         data1 = mat73.loadmat(file_mod1)
         data2 = mat73.loadmat(file_mod2)
+        print_and_log(f'Iteration {mod_i+1}: Using models {model[mod_ind[mod_i][0]]} & {model[mod_ind[mod_i][1]]}')
 
-        vox = np.arange(np.asarray(data4['Ytrain'][0]).squeeze().shape[1])
+        vox = np.arange(np.asarray(subj_data['Ytrain'][0]).squeeze().shape[1])
         # vox = tvals.argsort()[-11:-1]
         # vox = np.arange(tvals.shape[0])
         nvox = vox.shape[0]
         corrtest = np.zeros((3, nvox))
         corr1 = np.zeros((3, nvox))
         corr2 = np.zeros((3, nvox))
-        beta1 = []
-        beta2 = []
-        pred1 = []
-        pred2 = []
-        hyperparam = []
-        for f in range(3):
-            Xtrain_cv_mod1 = np.asarray(data1['Xtrain'][f]).squeeze()
-            # Ytrain_cv_mod1= data['Ytrain']
-            Xtest_cv_mod1 = np.asarray(data1['Xtest'][f]).squeeze()
-            # Ytest_cv_mod1 = data['Ytest']
+        beta1, beta2, pred1, pred2, hyperparam = [], [], [], [], []
 
+        # 3 rounds of cross validation
+        for f in range(3):
+            # Get train and test data
+            Xtrain_cv_mod1 = np.asarray(data1['Xtrain'][f]).squeeze()
+            Xtest_cv_mod1 = np.asarray(data1['Xtest'][f]).squeeze()
+            # Ytrain_cv_mod1= data['Ytrain']
+            # Ytest_cv_mod1 = data['Ytest']
             Xtrain_cv_mod2 = np.asarray(data2['Xtrain'][f]).squeeze()
-            Ytrain_cv = np.asarray(data4['Ytrain'][f]).squeeze()
             Xtest_cv_mod2 = np.asarray(data2['Xtest'][f]).squeeze()
-            Ytest_cv = np.asarray(data4['Ytest'][f]).squeeze()
+            Ytrain_cv = np.asarray(subj_data['Ytrain'][f]).squeeze()
+            Ytest_cv = np.asarray(subj_data['Ytest'][f]).squeeze()
 
             # num voxels, size model 1, size model 2, num of times
             p1 = Xtrain_cv_mod1.shape[1]
@@ -192,14 +202,14 @@ for s in subj:
                 corr2[f, i] = np.corrcoef(Yhat2[:, i], Yte[:, i])[0, 1]
 
             plot_figures(fit_banded_polar, Yhat)
-            print(fit_banded_polar['performance'])
+            print_and_log(f'Fitted banded polar: {fit_banded_polar["performance"]}')
 
-        print(corrtest)
+        print_and_log(f'Corrtest: {corrtest}')
         mean_perf = np.mean(corrtest, axis=0)
         mean_perf_1 = np.mean(corr1, axis=0)
         mean_perf_2 = np.mean(corr2, axis=0)
 
-        out_s = s + "_results_body_" + model[mod_ind[mod][0]] + "_" + model[mod_ind[mod][1]] + ".mat"
+        out_s = s + "_results_body_" + model[mod_ind[mod_i][0]] + "_" + model[mod_ind[mod_i][1]] + ".mat"
         output = data_folder / out_s
 
         scipy.io.savemat(output, {'mean_perf': mean_perf, 'mean_perf_1': mean_perf_1, 'mean_perf_2': mean_perf_2,

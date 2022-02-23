@@ -16,7 +16,7 @@ from calculate_statistics import calculate_statistics
     numeric values', and press Download.
 """
 
-ba = BehavioralAnalysis(ba_numbers=['2'])
+ba = BehavioralAnalysis(ba_numbers=['2', '1', 'all'])
 
 questions = get_questions()
 calculate_statistics(questions, force=False)
