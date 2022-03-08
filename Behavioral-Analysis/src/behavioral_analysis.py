@@ -97,54 +97,79 @@ class BehavioralAnalysis:
                         dpi=self.dpi, bbox_inches='tight')
             plt.close()
 
-    def create_boxplots(self, question: dict, only_hist=False):
+    def create_boxplots(self, question: dict, sum_viewpoints=False, only_hist=False):
         """
         TODO
         """
         for ba_num in self.get_loops(question):
-            save_dir = f'{self.out_dir[ba_num]}boxplots/{question["prefix"]}'
+            subdir = f'all_viewpoints'
+            if sum_viewpoints:
+                subdir = f'viewpoint_avg'
+            save_dir = f'{self.out_dir[ba_num]}boxplots/{subdir}/{question["prefix"]}'
             if not os.path.exists(save_dir):
                 os.makedirs(save_dir)
+
 
             stats = self.load_statistics(question, ba_num)
 
             scatter_data = []
             loop_desc = f'Creating {question["prefix"]} boxplots (BA {ba_num})'
             for uparam, dfs_of_vps in tqdm(stats.items(), loop_desc):
-                # sum over viewpoints
-                raw_all = []
-                for i, (pose_name, vp_dict) in enumerate(dfs_of_vps.items()):
-                    raw_all.extend(vp_dict['raw'])
-                scatter_data.append([uparam, np.mean(raw_all)])
+                hist_data = []
+                if sum_viewpoints:
+                    # sum over viewpoints
+                    raw_all = []
+                    for i, (pose_name, vp_dict) in enumerate(dfs_of_vps.items()):
+                        raw_all.extend(vp_dict['raw'])
+                    scatter_data.append([uparam, np.mean(raw_all)])
+                    hist_data.append(['proxy', raw_all])
+                else:
+                    for i, (pose_name, vp_dict) in enumerate(dfs_of_vps.items()):
+                        hist_data.append([pose_name, vp_dict['raw']])
+                        scatter_data.append([pose_name, np.mean(vp_dict['raw'])])
+
                 if not only_hist:
-                    fig, ax = plt.subplots(1, 2)
-                    fig.suptitle(f'{uparam} (Scale = {self.scale[uparam]})')
+                    for pose_name, hd in hist_data:
+                        fig, ax = plt.subplots(1, 2)
+                        if sum_viewpoints:
+                            fig.suptitle(f'{uparam} (Scale = {self.scale[uparam]})')
+                        else:
+                            fig.suptitle(pose_name)
 
-                    ax[0].boxplot(raw_all, positions=[0])
-                    ax[0].plot([0], np.mean(raw_all), '+', label='Mean')
-                    ax[0].set_ylim((question['likert_min'] - 1, question['likert_max'] + 1))
-                    ax[0].set_yticks(range(question['likert_min'], question['likert_max'] + 1))
-                    ax[0].set_yticklabels(range(question['likert_min'],
-                                                question['likert_max'] + 1))
-                    ax[0].set_ylabel(f'{question["likert_str_min"]}     =>     '
-                                     f'{question["likert_str_max"]}')
-                    ax[0].tick_params(labelbottom=False, bottom=False)
-                    ax[0].legend(frameon=False)
+                        ax[0].boxplot(hd, positions=[0])
+                        ax[0].plot([0], np.mean(hd), '+', label='Mean')
+                        ax[0].set_ylim((question['likert_min'] - 1, question['likert_max'] + 1))
+                        ax[0].set_yticks(range(question['likert_min'], question['likert_max'] + 1))
+                        ax[0].set_yticklabels(range(question['likert_min'],
+                                                    question['likert_max'] + 1))
+                        ax[0].set_ylabel(f'{question["likert_str_min"]}     =>     '
+                                         f'{question["likert_str_max"]}')
+                        ax[0].tick_params(labelbottom=False, bottom=False)
+                        ax[0].legend(frameon=False)
 
-                    im = mpimg.imread(f'../input/stim_images/{uparam}_Viewpoint_2_scale_'
-                                      f'{self.scale[uparam]}.png')
-                    ax[1].set_title('Viewpoint 2')
-                    ax[1].tick_params(left=False, labelleft=False,
-                                      labelbottom=False, bottom=False)
-                    ax[1].imshow(im)
+                        if sum_viewpoints:
+                            im = mpimg.imread(f'../input/stim_images/{uparam}_Viewpoint_2_scale_'
+                                              f'{self.scale[uparam]}.png')
+                            ax[1].set_title('Viewpoint 2')
+                        else:
+                            im = mpimg.imread(f'../input/stim_images/{pose_name}.png')
+                            vi = pose_name.find("View")
+                            ax[1].set_title(f'Viewpoint {pose_name[vi+10:vi+11]}')
 
-                    strt = int(np.floor(np.mean(raw_all)))
-                    subfolder = f'{save_dir}/{strt}-{strt+1}'
-                    if not os.path.exists(subfolder):
-                        os.mkdir(subfolder)
-                    plt.savefig(f'{subfolder}/{uparam}_scale_{self.scale[uparam]}',
-                                dpi=self.dpi, bbox_inches='tight')
-                    plt.close()
+                        ax[1].tick_params(left=False, labelleft=False,
+                                          labelbottom=False, bottom=False)
+                        ax[1].imshow(im)
+
+                        strt = int(np.floor(np.mean(hd)))
+                        subfolder = f'{save_dir}/{strt}-{strt+1}'
+                        if not os.path.exists(subfolder):
+                            os.mkdir(subfolder)
+                        save_path = f'{subfolder}/{uparam}_scale_{self.scale[uparam]}'
+                        if not sum_viewpoints:
+                            save_path = f'{subfolder}/{pose_name}'
+                        plt.savefig(save_path, dpi=self.dpi, bbox_inches='tight')
+                        plt.close()
+
             scatter_data = np.array(scatter_data)
             # Sort by value, but keep (name, value) setup
             scatter_data = scatter_data[np.argsort(scatter_data[:, 1])]
@@ -165,18 +190,29 @@ class BehavioralAnalysis:
             plt.plot(x, p, 'k', linewidth=2,
                      label=f'mu = {round(mu, 2)}, std = {round(std, 2)}')
             plt.legend()
-            plt.savefig(f'{save_dir}/{question["prefix"]}_hist',
-                        dpi=self.dpi, bbox_inches='tight')
+            save_path = f'{save_dir}/{question["prefix"]}_hist_all_vps'
+            if sum_viewpoints:
+                save_path = f'{save_dir}/{question["prefix"]}_hist_vp_avg'
+            plt.savefig(save_path, dpi=self.dpi, bbox_inches='tight')
             plt.close()
 
             # Print & export overview of values
-            out_file = open(f'{save_dir}/{question["prefix"]}_values.txt', 'w')
+            if sum_viewpoints:
+                out_file = open(f'{save_dir}/{question["prefix"]}_values_vps_avg.txt', 'w')
+            else:
+                out_file = open(f'{save_dir}/{question["prefix"]}_values_all_vps.txt', 'w')
+
             out_file.write(f'Stimuli, {question["likert_str_min"]} '
                            f'({question["likert_min"]}) => {question["likert_str_max"]}'
                            f'({question["likert_max"]})\n\n')
             for i in range(len(scatter_data[0])):
-                out_file.write(f'{format(scatter_data[0][i] + " (" + self.scale[scatter_data[0][i]] + "),", " <30")}'
-                               f'{round(float(scatter_data[1][i]), 2)}\n')
+                if sum_viewpoints:
+                    out_str = f'{format(scatter_data[0][i] + " (" + self.scale[scatter_data[0][i]] + "),", " <30")}'
+                else:
+                    out_str = f'{format(scatter_data[0][i], " <40")}'
+
+                out_str += f'{round(float(scatter_data[1][i]), 2)}\n'
+                out_file.write(out_str)
                 if i % 10 == 9:
                     out_file.write('\n')
             out_file.close()

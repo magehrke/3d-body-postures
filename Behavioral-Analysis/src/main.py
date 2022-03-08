@@ -16,7 +16,7 @@ from calculate_statistics import calculate_statistics
     numeric values', and press Download.
 """
 
-ba = BehavioralAnalysis(ba_numbers=['2', '1', 'all'])
+ba = BehavioralAnalysis(ba_numbers=['all'])
 
 questions = get_questions()
 calculate_statistics(questions, force=False)
@@ -24,8 +24,9 @@ calculate_statistics(questions, force=False)
 for q in questions:
     # Barplots only for questions that had categories to choose from
     if 'categories' in q:
-        ba.barplot(question=q, hist_only=False)
+        #ba.barplot(question=q, hist_only=False)
+        pass
     # all others are likert-scale questions where we can create boxplots
     else:
-        ba.create_boxplots(question=q, only_hist=False)
+        ba.create_boxplots(question=q, sum_viewpoints=False, only_hist=True)
 
