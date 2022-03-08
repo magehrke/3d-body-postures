@@ -189,7 +189,7 @@ def calculate_stats_per_question(questions: [dict], uparam_dict_1, uparam_dict_2
     q_names = ['emotion', 'bodypart', 'realism', 'dailyaction', 'possibility', 'movement']
     for q_name in q_names:
         save_dir = f'../output/all/stat_dicts/{q_name}_dict.pkl'
-        if not os.path.exists(save_dir):
+        if not os.path.exists(save_dir) or force:
             stats = {}
             with open(f'../output/behavioral_analysis_1/stat_dicts/{q_name}_dict.pkl', "rb") as input_file:
                 stats_1 = pickle.load(input_file)
@@ -204,7 +204,7 @@ def calculate_stats_per_question(questions: [dict], uparam_dict_1, uparam_dict_2
                     raw_2 = uparam_2[pose_name]['raw']
                     # Flip likert scale for possibility question in the first analysis
                     if q_name == 'possibility':
-                        raw_1 = np.flip(raw_1)
+                        raw_1 = np.array([6 - x for x in raw_1])
                     desc = {'raw': np.concatenate((raw_1, raw_2))}
                     uparam_stats[pose_name] = desc
                 stats[uparam_name] = uparam_stats
