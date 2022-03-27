@@ -16,6 +16,7 @@ from sklearn.metrics import r2_score
 import numpy.matlib as mat
 from pathlib import Path
 import logging
+import sys
 
 """
 Created on Fri Jul  2 15:29:33 2021
@@ -63,7 +64,8 @@ data_folder = Path("../data/Main_effect")
 
 name = ["_data_python.mat"]
 mod_suffix = "_data_python_transform_0.mat"
-subj = ["S11", "S13", "S14", "S15", "S16", "S17", "S19", "S20", "S22", "S23"]
+# Beware: Dimension Error in S14
+subj = ["S13"]
 model = ["kp2d", "kp3d", "gabor", "VAE_enc", "VAEparam", "VAE_dec"]
 # model = ["kp3d","kp2d","gabor"]
 # model = ["VAE_enc_L1","VAE_enc_L2","VAE_enc","VAE_dec_L1","VAE_dec_L2","VAE_dec","VAEparam"]
@@ -79,7 +81,7 @@ for s in subj:
     subject_data = data_folder / subject_file_path
     subj_data = mat73.loadmat(subject_data)
 
-    for mod_i in range(mod_ind.shape[0]):
+    for mod_i in range(12, mod_ind.shape[0]):
         # Load model data
         file_mod1 = data_folder / (model[mod_ind[mod_i][0]] + mod_suffix)
         file_mod2 = data_folder / (model[mod_ind[mod_i][1]] + mod_suffix)
