@@ -65,7 +65,7 @@ data_folder = Path("../data/Main_effect")
 name = ["_data_python.mat"]
 mod_suffix = "_data_python_transform_0.mat"
 
-subj = ["S5", "S6", "S7", "S8", "S9", "S10", "S11", "S13", "S15", "S17", "S18", "S19", "S20", "S22", "S23"]
+subj = ["S5", "S6", "S7", "S8", "S9", "S10", "S11", "S13", "S15", "S16", "S17", "S18", "S19", "S20", "S22", "S23"]
 model = ["kp2d", "kp3d", "gabor"]
 # model = ["kp3d","kp2d","gabor"]
 # model = ["VAE_enc_L1","VAE_enc_L2","VAE_enc","VAE_dec_L1","VAE_dec_L2","VAE_dec","VAEparam"]
