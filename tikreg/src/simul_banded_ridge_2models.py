@@ -81,7 +81,7 @@ for s in subj:
     subject_data = data_folder / subject_file_path
     subj_data = mat73.loadmat(subject_data)
 
-    for mod_i in range(12, mod_ind.shape[0]):
+    for mod_i in range(mod_ind.shape[0]):
         # Load model data
         file_mod1 = data_folder / (model[mod_ind[mod_i][0]] + mod_suffix)
         file_mod2 = data_folder / (model[mod_ind[mod_i][1]] + mod_suffix)
