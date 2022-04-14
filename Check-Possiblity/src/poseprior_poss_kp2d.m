@@ -1,6 +1,6 @@
 % ------------------------------------ % 
 % Define the parts you would like to run
-calc_poseprior_possibility = true;
+calc_poseprior_possibility = false;
 
 % Go to the parentfolder (called "Check-Possibility" atm)
 cd('/home/magehrke/Github/3D Body Postures/Check-Possiblity/');
@@ -11,17 +11,17 @@ addpath("poseprior");
 mat = load('data/all_params_enc_mod_12_runs.mat');
 stim = mat.stim;
 
-% Fill an array with the kp3d data
+% Fill an array with the kp2d data
 % Fill an array with the uparam and viewpoint data
-kp3d_arr={}; param_view = [];
+kp2d_arr={}; param_view = [];
 for i=1:length(stim)-6
     info_struc = stim(i).run(1).info;
     for j=1:length(info_struc)
-        kp3d_arr(end+1) = {info_struc(j).kp3d};
+        kp2d_arr(end+1) = {info_struc(j).kp2d};
     end 
     param_view = [param_view;[info_struc.uparam;info_struc.viewpoint;info_struc.scale].'];
 end
-kp3d_arr = kp3d_arr.';
+kp2d_arr = kp2d_arr.';
 
 % ------------------------------------------------------------------- %
 % Calculate which pose is possible/impossible by using PosePrior
@@ -32,7 +32,7 @@ if calc_poseprior_possibility
     joints_lst={};
     for i=1:length(param_view)
         for_loop_percent(i, 324);
-        kp3d = kp3d_arr{i,1};
+        kp2d = kp2d_arr{i,1};
         % Rearrange joints
         % 1: belly, 2: Neck, 
         % 3: L-shldr, 4: L-elbow, 5: L-wrist, 
@@ -40,7 +40,7 @@ if calc_poseprior_possibility
         % 9: face, 
         % 10: L-hip, 11: L-knee, 12: L-ankle, 13: L-foot
         % 14: R-hip, 15: R-knee, 16: R-ankle, 17: R-foot, 
-        joints = kp3d([ ...
+        joints = kp2d([ ...
             7,13, ...
             18,20,22, ...
             17,19,21, ...
@@ -48,10 +48,12 @@ if calc_poseprior_possibility
             3,6,9,12 ...
             2,5,8,11, ...
             ],:);
+        % Add array of zeros as z axis
+        joints(:, 3) = zeros(length(joints), 1);
         % Swap columns because the method has z, y, x
         joints_first_col = joints(:, 1);
-        joints(:, 1) = -joints(:, 3); % NEGATIVE!
-        joints(:, 3) = -joints_first_col; % NEGATIVE!
+        joints(:, 1) = joints(:, 3);
+        joints(:, 3) = joints_first_col; % NEGATIVE!
         % Scaling (does not matter, I hope!, except for plotting)
         factor = 20 / (joints(2, 2) - joints(16, 2));
         joints = joints * factor;
@@ -137,9 +139,9 @@ stimuli_diff_rslts = [stimuli_diff_names, stimuli_diff_rslts];
 stimuli_diff_rslts = stimuli_diff_rslts(idx,:);   % sort the whole matrix using the sort indices
 
 % ------------------------------------------------------------------- %
-% Plot the joints of kp3d
+% Plot the joints of kp2d
 rs = randsample(1:324, 1);
-rs = 111;
-poseprior_plot_joints('3d', joints_lst{rs}, ...
+rs = 129;
+poseprior_plot_joints('2dFrom3d', joints_lst{rs}, ...
     "Uparam " + param_view(rs, 1) + " VP " + param_view(rs, 2) + char(176));
 

@@ -69,7 +69,7 @@ for poss_ind, pose in enumerate(poss_posenames):
     elif poss_val < 2.34 and real_val < 2.34:
         p_low_r_low.append([pose, poss_val, real_val])
 
-# PRINTING
+# PRINTING 1 (readable)
 out_file = open(f'{save_dir}grouping_poss_real_3categories.txt', 'w')
 out_file.write(f'Behavioral Questions: Possiblity & Realism\n')
 out_file.write(f'Cutoff points: high > 3.66, low < 2.34.\n\n')
@@ -84,6 +84,21 @@ for g_name, g in zip(group_names, group_stack):
     g_strings = [''.join(str(x)) for x in g]
     g_strings = [x + '\n' for x in g_strings]
     out_file.writelines(g_strings)
+out_file.close()
+
+# PRINTING 2 (processable)
+out_file = open(f'{save_dir}grouping_poss_real_3categories.csv', 'w')
+group_stack = [p_high_r_high, p_high_r_low, p_low_r_high, p_low_r_low]
+out_file.write(f'uparam,group_index,possibility,realism\n')
+for group_idx, group_data in enumerate(group_stack):
+    for group_line in group_data:
+        for i, data_point in enumerate(group_line):
+            out_file.write(str(data_point))
+            if i != len(group_line) - 1:
+                out_file.write(",")
+            if i == 0:
+                out_file.write(str(group_idx) + ',')
+        out_file.write('\n')
 out_file.close()
 
 
@@ -114,7 +129,7 @@ for poss_ind, pose in enumerate(poss_posenames):
     elif poss_val <= 3 and real_val <= 3:
         p_low_r_low.append([pose, poss_val, real_val])
 
-# PRINTING
+# PRINTING (readable)
 out_file = open(f'{save_dir}grouping_poss_real_2categories.txt', 'w')
 out_file.write(f'Behavioral Questions: Possiblity & Realism\n')
 out_file.write(f'Cutoff points: high > 3, low <= 3.\n\n')
@@ -132,3 +147,17 @@ for g_name, g in zip(group_names, group_stack):
 out_file.close()
 
 
+# PRINTING 2 (processable)
+out_file = open(f'{save_dir}grouping_poss_real_2categories.csv', 'w')
+group_stack = [p_high_r_high, p_high_r_low, p_low_r_high, p_low_r_low]
+out_file.write(f'uparam,group_index,possibility,realism\n')
+for group_idx, group_data in enumerate(group_stack):
+    for group_line in group_data:
+        for i, data_point in enumerate(group_line):
+            out_file.write(str(data_point))
+            if i != len(group_line) - 1:
+                out_file.write(",")
+            if i == 0:
+                out_file.write(str(group_idx) + ',')
+        out_file.write('\n')
+out_file.close()

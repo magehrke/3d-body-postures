@@ -1,26 +1,74 @@
-Si_inv = Si.';
-x = Si_inv(:, 1);
-y = Si_inv(:, 2);
-z = Si_inv(:, 3);
+function poseprior_plot_joints(selector, pose, name)
+    arguments
+        selector string = 'none';
+        pose {isnumeric} = nan;
+        name string = '';
+    end
+    staticPose = load("staticPose.mat");
+    if strcmp(selector, '3d')
+        plot3dpose(pose, staticPose.edges, name);
+    elseif strcmp(selector, '2dFrom3d')
+        plot2dposeFrom3d(pose, staticPose.edges, name);
+    end
 
-figure;
-scatter3(x, y, z);
-% Label
-a = (1:17).'; b = num2str(a); c = cellstr(b);
-dx = 0.1; dy = 0.1; dz = 0.1; % displacement so the text does not overlay the data points
-text(x+dx, y+dy, z+dz, c);
-hold on
-% Plot the edges between the points that are written in "edges" object
-for i=1:length(edges)
-    line = [Si_inv(edges(i,1),:); Si_inv(edges(i,2),:);];
-    plot3(line(:, 1), line(:, 2), line(:, 3));
+    % Uncomment to plot 3D of static Pose
+    % plot3dpose(staticPose.Si.', staticPose.edges, 'Static Pose');
+    % Uncomment to plot 2D of static Pose (inferred from 3d)
+    plot2dposeFrom3d(staticPose.Si.', staticPose.edges, 'Static Pose');
 end
-hold off
 
+function plot3dpose(pose, edges, name)
+    x = pose(:, 1);
+    y = pose(:, 2);
+    z = pose(:, 3);
+    
+    figure('Name', name);
+    scatter3(x, y, z);
+    xlabel('x-axis')
+    ylabel('y-axis')
+    zlabel('z-axis')
+    % Label
+    a = (1:17).'; b = num2str(a); c = cellstr(b);
+    dx = 0.1; dy = 0.1; dz = 0.1; % displacement so the text does not overlay the data points
+    text(x+dx, y+dy, z+dz, c);
+    hold on
+    % Plot the edges between the points that are written in "edges" object
+    for i=1:length(edges)
+        line = [pose(edges(i,1),:); pose(edges(i,2),:);];
+        plot3(line(:, 1), line(:, 2), line(:, 3));
+    end
+    hold off
 
+    axis equal;
+    axis vis3d;
+    h = rotate3d;
+    h.RotateStyle = 'orbit';
+    h.Enable = 'on';
+end
 
-axis equal;
-axis vis3d;
-h = rotate3d;
-h.RotateStyle = 'orbit';
-h.Enable = 'on';
+function plot2dposeFrom3d(pose, edges, name)
+    y = pose(:, 2);
+    z = pose(:, 3);
+
+    figure('Name', name);
+    scatter(z, y);
+    xlabel('x-axis')
+    ylabel('y-axis')
+    % Label
+    a = (1:17).'; b = num2str(a); c = cellstr(b);
+    dy = 0.1; dz = 0.1; % displacement so the text does not overlay the data points
+    text(z+dz, y+dy, c);
+    hold on
+    % Plot the edges between the points that are written in "edges" object
+    for i=1:length(edges)
+        line = [pose(edges(i,1),:); pose(edges(i,2),:);];
+        plot(line(:, 3), line(:, 2));
+    end
+    hold off
+    
+    axis equal;
+    axis vis3d;
+    h = rotate3d;
+    h.RotateStyle = 'orbit';
+    h.Enable = 'on';
+end
