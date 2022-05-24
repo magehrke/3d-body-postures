@@ -1,20 +1,22 @@
-function poseprior_plot_joints(selector, pose, name)
+function poseprior_plot_joints(selector, pose, name, static_pose)
     arguments
         selector string = 'none';
         pose {isnumeric} = nan;
         name string = '';
+        static_pose {boolean} = false;
     end
     staticPose = load("staticPose.mat");
     if strcmp(selector, '3d')
         plot3dpose(pose, staticPose.edges, name);
+        if static_pose
+            plot3dpose(staticPose.Si.', staticPose.edges, 'Static Pose');
+        end
     elseif strcmp(selector, '2dFrom3d')
         plot2dposeFrom3d(pose, staticPose.edges, name);
+        if static_pose
+            plot2dposeFrom3d(staticPose.Si.', staticPose.edges, 'Static Pose');
+        end
     end
-
-    % Uncomment to plot 3D of static Pose
-    % plot3dpose(staticPose.Si.', staticPose.edges, 'Static Pose');
-    % Uncomment to plot 2D of static Pose (inferred from 3d)
-    plot2dposeFrom3d(staticPose.Si.', staticPose.edges, 'Static Pose');
 end
 
 function plot3dpose(pose, edges, name)

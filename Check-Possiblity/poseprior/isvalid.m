@@ -9,8 +9,8 @@ function [flags, S2] = isvalid(S)
 % Revision (May 20, 2015)
 % Output S2: The closest valid pose to S
 
-% edges = [1 2 3 4 2 6 7 2 1 10 11 12 1 14 15 16;...
-%      2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17]';
+%edges = [1 2 3 4 2 6 7 2  1 10 11 12  1 14 15 16;...
+%         2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17]';
  
 global prnts chlds chldsT di a % shared with global2local and local2global function
 
@@ -111,7 +111,7 @@ if nargout>1
                 v = v/norm(v(1:3));
                 
                 if any(isnan(v))
-                    disp('Invalid v!');
+                    % TODO disp('Invalid v!');
                 end
                 e1 = v(1:3);
                 e2 = squeeze(E2{i}(t_p,p_p,:));

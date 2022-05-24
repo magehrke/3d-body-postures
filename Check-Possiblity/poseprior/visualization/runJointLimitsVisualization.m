@@ -52,20 +52,20 @@ lnC = 0.4*[1 1 1];
 
 % Figure resize function
 function figResize(src, evt)
-    set(f, 'Units','characters');
-    fpos = get(f,'Position');
+    set(src, 'Units','characters');
+    fpos = get(src,'Position');
     
 %     [100 8 20 27]
 %     [1/20 8 100 27]
-    set(rightPanel,'Position',[fpos(3)*100/120 fpos(4)*5/35 fpos(3)*20/120 fpos(4)*30/35])
-    set(centerPanel,'Position',[1/20 fpos(4)*5/35 fpos(3)*100/120 fpos(4)*30/35]);    
+    set(src,'Position',[fpos(3)*100/120 fpos(4)*5/35 fpos(3)*20/120 fpos(4)*30/35])
+    set(src,'Position',[1/20 fpos(4)*5/35 fpos(3)*100/120 fpos(4)*30/35]);    
 end
 
 % Right panel resize function
 function rightPanelResize(src, evt)
 %     [3 2 13 24]
-    rpos = get(rightPanel,'Position');
-    set(listBox,'Position',[rpos(3)*3/20 rpos(4)*2/30 rpos(3)*13/20 rpos(4)*24/30]);
+    rpos = get(src,'Position');
+    set(src,'Position',[rpos(3)*3/20 rpos(4)*2/30 rpos(3)*13/20 rpos(4)*24/30]);
 end
 
 %% Callback for list box
