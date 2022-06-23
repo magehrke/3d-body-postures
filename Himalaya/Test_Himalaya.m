@@ -1,10 +1,13 @@
-%% HDF5 
-clear all
-maindir = '/home/magehrke/data/Main_effect';
-resdir = fullfile(maindir,'Models');
-models = dir(fullfile(maindir,'*transform_0.mat'));
+%% HDF5
+% Write models from mat into h5 files split by its crossvalidation runs
+% Keep the Xtest (4161 param) / Xtrain (2080 params) structure
+clear all;
+modeldir = '/home/magehrke/data/Models';
+resdir = '/home/magehrke/data/himalaya';
+models = dir(fullfile(modeldir,'*transform_0.mat'));
 
 for i =1:length(models)
+    % Get Xtrain & Xtest of the model
     load(fullfile(models(1).folder,models(i).name))
     [~,name,ext] = fileparts(models(i).name);
     for f=1:3
@@ -16,111 +19,134 @@ for i =1:length(models)
 end
 
 
-% split = squeeze(mean(cv_scores_split));
-% for i =1:size(split,1)
-%     histogram(split(i,split(i,:)>0));
-%     hold on
-% end
+%% Create synthetic data
+clear all;
+modeldir = '/home/magehrke/data/Models';
+load(fullfile(modeldir, 'kp2d_data_python_transform_0.mat'));
+load(fullfile(modeldir,'hrf.mat')); % Load hrf into workspace
+models = dir(fullfile(modeldir,'*transform_0.mat'));
 
-
-%% Fake data
-clear all
-maindir = '/home/magehrke/data/Main_effect';
-load(fullfile(maindir,'hrf.mat'));
-models = dir(fullfile(maindir,'*transform_0.mat'));
-% models([2,3,4,6,7,13,14]) = [];
 nvox = 10;
 avg_var = 24.16;
-% a1 = 10*2.16e4;
-a1 = 6.47;
-% a1=avg_var*10;
-a2 = 0;
-a3= 0; 
-a4=0;
-a5 = 1;
-a6=0;
-  s=0;
 
-for k =1:length(models)
-    load(fullfile(models(1).folder,models(k).name))
+% Load onset
+% TODO: HOW TO USE?? Isn't it obsolete?
+load(fullfile(modeldir, 'training_runs_onsets.mat'))
+
+
+for k=1:length(models)
+    load(fullfile(models(k).folder,models(k).name))
     [~,name,ext] = fileparts(models(k).name);
-    Xtr= cell2mat(Xtrain(1));
-%     Xtr = zscore(Xtr,[],2);
 
+
+
+    % Take first (of 3) crossval runs
+    Xtr= cell2mat(Xtrain(1));
+    indtr = find(sum(Xtr,2));
+
+    % Convolve Xtrain with hrf function
     for i=1:size(Xtr,2)
         temp = conv(Xtr(:,i),hrf);
         Xtr(:,i) = temp(1:size(Xtr,1));
     end
-    bt(k).mod = 10*rand(size(Xtr,2),nvox);
-    Xtrr(k).mod = Xtr;
-    
 
-    Xte= cell2mat(Xtest(1));
-%     Xte = zscore(Xte,[],2);
+    % Center and scale
+    Xtr_ind = Xtr(indtr,:);
+    mean_tr1 = mean(Xtr_ind, 1);
+    std_tr1 = std(Xtr_ind, [], 1);
+    Xtr = (Xtr - mean_tr1) ./ std_tr1;
+    vari(k).mod = (var(Xtr, [], "all"));
 
+    % Saves Xtrain*hdf of each model in one variable
+    Xtr_hdf(k).mod = Xtr;
+
+    % Take first (of 3) crossval runs
+    Xte = cell2mat(Xtest(1));
+    indte = find(sum(Xte,2));
+
+    % Convolve Xtest with hrf function
     for i=1:size(Xte,2)
         temp = conv(Xte(:,i),hrf);
         Xte(:,i) = temp(1:size(Xte,1));
     end
-    Xtee(k).mod = Xte;
+
+    % Center and scale
+    % TODO: Use scaling from training data?
+    %mean_te1 = mean(Xte, 1);
+    %std_te1 = std(Xte, [], 1);
+    Xte(indte, :) = (Xte(indte, :) - mean_tr1) ./ std_tr1;
+
+    % Saves Xtrain*hdf of each model in one variable   
+    Xte_hdf(k).mod = Xte;
+
+    % Saves *nvox* random values of model-parameter size in one variable
+    bt(k).mod = 10*rand(size(Xtr,2),nvox);
 end
+
+a1 = 0;
+a2 = 1;
+a3 = 1; 
+a4 = 0;
+a5 = 0;
+a6 = 0; 
+s = 150;
+
+% Multiplies the random numbers of brain voxels by constant for each model
+% Convert to 1d list
 btrain = [];
 for i=1:length(models)
-btrain = [btrain;eval(sprintf("a%d",i))*bt(i).mod];
+    btrain = [btrain;eval(sprintf("a%d",i))*bt(i).mod];
 end
-Xtra= [];
-Xte = [];
+
+% Convert to 1d list
+Xtr_hdf_lst= [];
+Xte_hdf_lst = [];
 for i=1:length(models)
-    Xtra = [Xtra,(Xtrr(i).mod)];
-    Xte = [Xte,(Xtee(i).mod)];
+    Xtr_hdf_lst = [Xtr_hdf_lst,(Xtr_hdf(i).mod)];
+    Xte_hdf_lst = [Xte_hdf_lst,(Xte_hdf(i).mod)];
 end
 
-    Ytr = Xtra*btrain;
-    Ytrn = Ytr +s*randn(size(Ytr));
-
-    SNR = var(Ytr(:,1))/var(Ytrn(:,1));
-    plot(zscore(Ytr(:,1))); hold on; plot(zscore(Ytrn(:,1)));
-    Yte = Xte*btrain;
-    Yten = Yte +s*randn(size(Yte));
-
-    SNR = var(Yte(:,1))/var(Yten(:,1));
+% Create Ytrain
+Ytr = Xtr_hdf_lst*btrain;
+Ytrn = Ytr +s*randn(size(Ytr)); % add noise
 Ytrain{1} = Ytrn;
+% Signal to Noise Ratio
+SNR = var(Ytr(:,1))/var(Ytrn(:,1));
+%plot(zscore(Ytr(:,1))); hold on; plot(zscore(Ytrn(:,1)));
+
+% Create Ytest
+Yte = Xte_hdf_lst*btrain;
+Yten = Yte +s*randn(size(Yte));
 Ytest{1} = Yten;
-% save('C:\Users\g.marrazzo\Desktop\Encoding_Python_Gallant\Data\Double\Fake_Sit_gabor_kp2d_kp3d_data_python.mat',"Ytrain","Ytest","btrain",'-v7.3');
-        feat = {'VAEdec','VAEenc','VAEparam','gabor','kp2d','kp3d'};
-figure
-for i =1:size(Xtrr,2)
-    v(:,i)= var(Xtrr(i).mod,[],2);
-    m(:,i) = mean(Xtrr(i).mod,2);
-    histogram(v(:,i));
-    hold on;
+SNR = var(Yte(:,1))/var(Yten(:,1));
+
+save('/home/magehrke/data/Main_effect/himalaya_fake_data_python.mat',"Ytrain","Ytest","btrain",'-v7.3');
+
+% Plot histogram of variance inside the features
+% Variance is counted for every timepoint in the training data
+% The variance of the models is extremely different
+calc_feat_variance = true;
+if calc_feat_variance
+    feat = {'VAEdec','VAEenc','VAEparam','gabor','kp2d','kp3d'};
+    figure
+    for i = 1:size(Xtr_hdf, 2)
+        v(:,i) = var(Xtr_hdf(i).mod,[], 2);
+        totalvar(:, i) = var(v(:, i));
+        fprintf('Variance %s: %f (%f) (n=%f)\n', feat{i}, var(Xtr_hdf(i).mod,[], "all"), var(Xtr_hdf(i).mod, [], "all"), ...
+            size(Xtr_hdf(i).mod, 2));
+        m(:,i) = mean(Xtr_hdf(i).mod,2);
+        histogram(v(:,i));
+        hold on;
+    end
+    title('Variances of features per model per timepoint');
+    ylabel('Number of timepoints');
+    xlabel('Variance');
+    legend(feat);
 end
-    legend(feat)
-
-   Y1 = a1*Xtrr(1).mod*bt(1).mod;
-
-    Y2 = a5*Xtrr(5).mod*bt(5).mod;
-%%
-load('C:\Users\g.marrazzo\Desktop\Encoding_Python_Gallant\Data\Double\Himalaya\Fake_gabor_kp2d_kp3d_results_S_it_output_VAE_dec_VAE_enc_VAEparam_gabor_kp2d_kp3d.mat')
-
-        feat = {'Sit','VAEdec','VAEenc','VAEparam','gabor','kp2d','kp3d'};
-%                 feat = {'Sit','VAEdec','VAEenc','VAEparam','gabor'};
 
 
-split = squeeze(corr_scores_split);
-for i =1:size(split,1)
-    histogram(split(i,:));
-    hold on
-end
-legend(feat)
-figure
-splitr2 = squeeze(r2_scores_split);
-splitr2 = splitr2./r2_scores;
-for i =1:size(splitr2,1)
-    histogram(splitr2(i,:));
-    hold on
-end
-legend(feat)
+Y1 = a1*Xtr_hdf(1).mod*bt(1).mod;
+Y2 = a5*Xtr_hdf(5).mod*bt(5).mod;
 
-figure
-plot((Xtrr(1).mod)*bt(1).mod(:,1)); hold on; plot((Xtrr(5).mod)*bt(5).mod(:,1)); plot((Xtrr(6).mod)*bt(6).mod(:,1));
+    
+disp('Finished!')

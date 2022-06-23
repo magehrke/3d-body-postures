@@ -9,7 +9,7 @@ divide_poss_kp2d.py
 Created 12.04.2022
 @author MA Gehrke
 
-This script loads the kp2d data for as well as 
+This script loads the kp2d data as well as 
 the impossible/possible groups for each stimuli 
 (obtained from the behavioral analysis)
 and tries to replicate this clustering by using

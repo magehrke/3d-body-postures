@@ -1,3 +1,5 @@
+% Plotting keypoints 2D and 3D poses in matlab
+
 function poseprior_plot_joints(selector, pose, name, static_pose)
     arguments
         selector string = 'none';

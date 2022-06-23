@@ -10,12 +10,12 @@ correlate_poss_with_expert.py
 Created 14.04.2022
 @author MA Gehrke
 
-This scripts checks, how the opinions in the behavioral
+This script checks, how the opinions in the behavioral
 analysis about possibility coincides with the expert
 opinion.
 
 Note: People in behavioral analysis just saw the stimuli
-for 750ms or so, but expert for as long as wanted.
+for 750ms or so, but expert for as long as they wanted.
 """
 
 # Viewpoint conversion between degree and numeric value
@@ -39,23 +39,26 @@ scale = np.concatenate(scale).ravel()
 kp2d = np.array(kp2d)
 latent32d = np.squeeze(np.array(latent32d))
 
-
-# 2cat: the cutoff for possibility and realism is exactly at 3
+# Behavioral Analysis
+# 2cat: the cutoff for possibility and realism is exactly at 3 (= 2 categories per feature)
 # Higher is possible/real, lower is impossible/unreal
-# Group_index: 0 = both high, 1 = p high & r low, 2 = p low & r igh, 3 = both low
+# Group_index: 0 = both high, 1 = p high & r low, 2 = p low & r high, 3 = both low
 pd2cat = pd.read_csv(f'../data/grouping_poss_real_2categories.csv', sep=',')
+
+# BA: Select stimuli that are high or low on POSSIBILITY
 poss2cat = np.array(pd2cat[pd2cat['group_index'] < 2]['uparam'])
 imposs2cat = np.array(pd2cat[pd2cat['group_index'] > 1]['uparam'])
 assert poss2cat.shape[0] + imposs2cat.shape[0] == 324
-print(f'Length poss2cat: {len(poss2cat)}')
-print(f'Length imposs2cat: {len(imposs2cat)}\n')
+print(f'Stimuli that are > 3 in possiblity (high): {len(poss2cat)}')
+print(f'Stimuli that are < 3 in possiblity (low): {len(imposs2cat)}\n')
 
 # Import expert categorization
 pd_expert = pd.read_csv(f'../data/possibility_by_expert.csv')
+
+# Expert: Select stimuli that are high or low on POSSIBILITY
 poss_ex = np.array(pd_expert[pd_expert['possible_2d'] == 1][['uparam', 'viewpoint']])
 imposs_ex = np.array(pd_expert[pd_expert['possible_2d'] == 0][['uparam', 'viewpoint']])
 assert poss_ex.shape[0] + imposs_ex.shape[0] == 324
-
 print(f'Expert possible: {poss_ex.shape[0]}')
 print(f'Expert impossible: {imposs_ex.shape[0]}\n')
 

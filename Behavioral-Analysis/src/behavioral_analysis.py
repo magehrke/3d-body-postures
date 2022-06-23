@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
-from scipy.stats import norm
+from scipy.stats import norm, shapiro
 from tqdm import tqdm
 import os
 import pickle
@@ -50,7 +50,11 @@ class BehavioralAnalysis:
         # Resolution of the plots
         self.dpi = 200
 
-        # GET SCALES FOR EACH QUESTION/STIMULI/UPARAM
+        self.scale = BehavioralAnalysis.extract_scales()
+
+    @staticmethod
+    def extract_scales() -> dict:
+        """Extract and return the sale for each stimuli/question."""
         # Load file containing which question belongs to which pose
         p_items_lst = np.load('../input/behavioral_analysis_1/item-question-association.npy', allow_pickle=True).item()
         p_items_lst = dict(p_items_lst)
@@ -61,11 +65,12 @@ class BehavioralAnalysis:
         uparam_names = set(uparam_names)
         assert len(uparam_names) == 108
         # Extract scales
-        self.scale = {}
+        scale = {}
         for un in uparam_names:
             for stim in p_items_lst.keys():
                 if stim.startswith(f'{un}_'):
-                    self.scale[un] = stim[stim.find('scale') + 6:]
+                    scale[un] = stim[stim.find('scale') + 6:]
+        return scale
 
     def load_statistics(self, quest_dict: dict, ba_num: str) -> dict:
         """Load and return dictionary with the observations of the questions."""
@@ -75,27 +80,27 @@ class BehavioralAnalysis:
                 stats = pickle.load(input_file)
                 return stats
 
-    # Not used
-    def create_boxplots_vp(self, desc: dict, stats: dict):
-        loop_desc = f'Creating {desc["prefix"]} boxplots'
-        save_dir = f'boxplots-vp/{desc["prefix"]}'
-        if not os.path.exists(save_dir):
-            os.mkdir(save_dir)
-        for uparam, dfs_of_vps in tqdm(stats.items(), loop_desc):
-            y_labels = []
-            for i, (pose_name, vp_dict) in enumerate(dfs_of_vps.items()):
-                plt.boxplot(vp_dict['raw'], positions=[i+1])
-                y_labels.append(f'{i+1} (n={vp_dict["n"]})')
-            plt.title(f'{uparam} (Scale = {self.scale[uparam]})')
-            plt.ylim((desc['likert_min'] - 1, desc['likert_max'] + 1))
-            plt.yticks(range(desc['likert_min'], desc['likert_max'] + 1),
-                       range(desc['likert_min'],  desc['likert_max'] + 1))
-            plt.xticks(range(1, 4), y_labels)
-            plt.xlabel('Viewpoint')
-            plt.ylabel('Likert Scale')
-            plt.savefig(f'{save_dir}/{uparam}_scale_{self.scale[uparam]}',
-                        dpi=self.dpi, bbox_inches='tight')
-            plt.close()
+    # # Not used
+    # def create_boxplots_vp(self, desc: dict, stats: dict):
+    #     loop_desc = f'Creating {desc["prefix"]} boxplots'
+    #     save_dir = f'boxplots-vp/{desc["prefix"]}'
+    #     if not os.path.exists(save_dir):
+    #         os.mkdir(save_dir)
+    #     for uparam, dfs_of_vps in tqdm(stats.items(), loop_desc):
+    #         y_labels = []
+    #         for i, (pose_name, vp_dict) in enumerate(dfs_of_vps.items()):
+    #             plt.boxplot(vp_dict['raw'], positions=[i+1])
+    #             y_labels.append(f'{i+1} (n={vp_dict["n"]})')
+    #         plt.title(f'{uparam} (Scale = {self.scale[uparam]})')
+    #         plt.ylim((desc['likert_min'] - 1, desc['likert_max'] + 1))
+    #         plt.yticks(range(desc['likert_min'], desc['likert_max'] + 1),
+    #                    range(desc['likert_min'],  desc['likert_max'] + 1))
+    #         plt.xticks(range(1, 4), y_labels)
+    #         plt.xlabel('Viewpoint')
+    #         plt.ylabel('Likert Scale')
+    #         plt.savefig(f'{save_dir}/{uparam}_scale_{self.scale[uparam]}',
+    #                     dpi=self.dpi, bbox_inches='tight')
+    #         plt.close()
 
     @staticmethod
     def grouping_folder_names(likert_mean):
@@ -192,8 +197,15 @@ class BehavioralAnalysis:
             scatter_data = np.transpose(scatter_data)
             float_value_arr = np.array(scatter_data[1], dtype=np.float)
 
-            # Plot histogram of the posture means (incl. normal)
+            # Descriptive statistics and tests
+            print(f'------------------------------')
+            print(f'Descriptives {question["prefix"]} (ba_num={ba_num}, sum_vps={sum_viewpoints})')
             mu, std = norm.fit(float_value_arr)
+            print(shapiro(float_value_arr))
+            print(f'------------------------------')
+
+
+            # Plot histogram of the posture means (incl. normal)
             plt.hist(float_value_arr, bins=15, density=False, label=f'mu = {round(mu, 2)}, std = {round(std, 2)}')
             plt.ylabel('Number of stimuli')
             plt.xlabel(f'{question["likert_str_min"]}     =>     '
@@ -202,11 +214,10 @@ class BehavioralAnalysis:
             plt.xticks(range(question['likert_min'], question['likert_max'] + 1),
                        range(question['likert_min'], question['likert_max'] + 1))
             # Plot normal distribution
-            # xmin, xmax = plt.xlim()
-            # x = np.linspace(xmin, xmax, 100)
-            # p = norm.pdf(x, mu, std)
-            # plt.plot(x, p, 'k', linewidth=2,
-            #          label=f'mu = {round(mu, 2)}, std = {round(std, 2)}')
+            xmin, xmax = plt.xlim()
+            x = np.linspace(xmin, xmax, 100)
+            p = norm.pdf(x, mu, std)
+            plt.plot(x, p, 'k', linewidth=2)
             plt.legend()
             save_path = f'{save_dir}/{question["prefix"]}_hist_all_vps'
             if sum_viewpoints:

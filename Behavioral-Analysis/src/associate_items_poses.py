@@ -18,6 +18,8 @@ import numpy as np
     We save the question IDs that belong to a stimuli as a
     list in a dictionary with the stimuli name as key.
     ==> 'item-question-association.npy'
+    
+    This script needs to be executed only once!
 """
 
 

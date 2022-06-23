@@ -12,10 +12,14 @@ from numpy import ndarray
     Date: 15.03.2022
     
     We are grouping the stimuli regarding to 
-    their values of reality and possiblity
+    their values of realism and possibility
     in the behavioral analysis.
+    
+    Save the different ways of grouping the 
+    stimuli in the 'grouping' folder as a 
+    text (readable) and a csv (processable)
+    file.
 """
-
 
 def average_for_each_viewpoint(data) -> Tuple[ndarray, ndarray]:
     pose_names = []
@@ -129,7 +133,7 @@ for poss_ind, pose in enumerate(poss_posenames):
     elif poss_val <= 3 and real_val <= 3:
         p_low_r_low.append([pose, poss_val, real_val])
 
-# PRINTING (readable)
+# PRINTING 1 (readable)
 out_file = open(f'{save_dir}grouping_poss_real_2categories.txt', 'w')
 out_file.write(f'Behavioral Questions: Possiblity & Realism\n')
 out_file.write(f'Cutoff points: high > 3, low <= 3.\n\n')

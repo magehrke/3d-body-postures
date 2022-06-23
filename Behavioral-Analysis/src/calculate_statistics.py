@@ -18,7 +18,7 @@ def calculate_statistics(questions: [dict], force: bool = False) -> None:
 def get_uparams_ba_1():
     # Get data
     df = pd.read_csv(f'../input/behavioral_analysis_1/Questionnaire.csv')
-    print(f'Original DF shape: {df.shape}')
+    print(f'BA1 Original DF shape: {df.shape}')
 
     # Drop columns
     drop_names_starting_with = ['Timing', 'Rest time']
@@ -28,8 +28,8 @@ def get_uparams_ba_1():
 
     # Drop unfinished observations
     df = df[df['Finished'] != '0']
-    print(f'DF shape after dropping: {df.shape}')
-    print(f'Number of Subjects: {df.shape[0] - 2}')
+    print(f'BA1 DF shape after dropping: {df.shape}')
+    print(f'BA1 Number of Subjects: {df.shape[0] - 2}')
     c_names = df.columns.values
 
     # Load file containing which question belongs to which pose
@@ -70,7 +70,7 @@ def get_uparams_ba_1():
 def get_uparams_ba_2():
     # Get data
     df = pd.read_csv(f'../input/behavioral_analysis_2/Questionnaire.csv')
-    print(f'Original DF shape: {df.shape}')
+    print(f'BA2 Original DF shape: {df.shape}')
 
     # Drop columns
     drop_names_starting_with = ['Timing', 'Rest time']
@@ -80,8 +80,8 @@ def get_uparams_ba_2():
 
     # Drop unfinished observations
     df = df[df['Finished'] != '0']
-    print(f'DF shape after dropping: {df.shape}')
-    print(f'Number of Subjects: {df.shape[0] - 2}')
+    print(f'BA2 DF shape after dropping: {df.shape}')
+    print(f'BA2 Number of Subjects: {df.shape[0] - 2}')
     c_names = df.columns.values
 
     # Load file containing which question belongs to which pose

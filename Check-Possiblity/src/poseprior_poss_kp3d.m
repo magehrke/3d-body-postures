@@ -6,7 +6,6 @@ calc_expert_matching = false;
 calc_ba2_matching = true;
 calc_ba_third_matching = true;
 
-
 % Go to the parentfolder (called "Check-Possibility" atm)
 cd('/home/magehrke/Github/3D Body Postures/Check-Possiblity/');
 % We add the paths to the scripts here
@@ -15,10 +14,11 @@ addpath("poseprior");
 
 mat = load('data/all_params_enc_mod_12_runs.mat');
 stim = mat.stim;
+
 % ------------------------------------------------------------------- %
 % Viewpoint conversion structure
 vp_map = containers.Map([-45, 0, 45], ["1", "2", "3"]);
-% Edges strings to print on images
+% Strings of edges to print on image
 edges_str_lst = [
    "1: Belly - Neck", ...
    "2: Neck - L.Shoulder", ...
@@ -60,12 +60,13 @@ fprintf("%i stimuli in total.\n", length(kp3d_arr));
 % ------------------------------------------------------------------- %
 % Calculate which pose is possible/impossible by using PosePrior
 if calc_poseprior_possibility
-    poss_array = zeros(108, 16);
-    poss_bool = zeros(108, 1);
-    impossible_stimuli_uparams=[];
-    nearest_pose_poss_ctr = 0;
+    poss_array = zeros(108, 16); % bools for each joint of each pose
+    poss_bool = zeros(108, 1); % telling us if entire pose is possible
+    impossible_stimuli_uparams = [];
+    nearest_pose_poss_ctr = 0; % how many imposs poses can be made poss?
     imposs_not_adjustable = [];
-    joints_lst=cell(1, length(param_view));
+    joints_lst=cell(1, length(param_view)); % Joints after transformations
+    joints_adj_lst = cell(1, length(param_view)); % Joints of adjusted poses
     for i=1:length(param_view)
         for_loop_percent(i, length(param_view));
         kp3d = kp3d_arr{i,1};
@@ -99,24 +100,29 @@ if calc_poseprior_possibility
         joints_lst{i} = joints;
         joints = joints.';
     
+        % Returns (1) bool array with each joint of the pose
+        % (2) adjusted pose that displays the next best poss pose
         [poss_arr_i, pose_adj] = isvalid(joints);
         poss_arr_i(12) = 1; % setting feet as true
         poss_arr_i(16) = 1; % setting feet as true
         poss_array(i, :) = poss_arr_i;
         poss_bool(i) = all(poss_arr_i);
-
-        if ~ all(poss_arr_i)
-            
+        
+        % If a pose is impossible, try to find the next best pose
+        if ~ poss_bool(i)
             impossible_stimuli_uparams = [impossible_stimuli_uparams; param_view(i, 1)];
             % If the pose is not possible, is the adjusted pose poss?
-            rslt_adj = isvalid(pose_adj);
-            rslt_adj(12) = 1; % setting feet as true
-            rslt_adj(16) = 1; % setting feet as true       
-            if all(rslt_adj)
+            poss_arr_adj = isvalid(pose_adj);
+            poss_arr_adj(12) = 1; % setting feet as true
+            poss_arr_adj(16) = 1; % setting feet as true       
+            if all(poss_arr_adj)
+                joints_adj_lst{i} = pose_adj;
                 nearest_pose_poss_ctr = nearest_pose_poss_ctr + 1;
+                poseprior_plot_joints('3d', joints_lst{i}, "Uparam " + param_view(i, 1));
+                plotbrowser;
             else
-                imposs_not_adjustable = [imposs_not_adjustable; param_view(i, 1), rslt_adj];
-                if false % plot not adjustable impossible poses
+                imposs_not_adjustable = [imposs_not_adjustable; param_view(i, 1), poss_arr_adj];
+                if true % plot not adjustable impossible poses
                     poseprior_plot_joints('3d', joints_lst{i}, "Uparam " + param_view(i, 1));
                     plotbrowser;
                 end

@@ -7,6 +7,10 @@
     This file contains the questions (wrapped in
     dictionaries) that we used during the first
     and second behavioral analysis.
+
+    Each question is wrapped in a dictionary. Likert
+    questions and categorical questions alwayas have
+    the same keys.
 """
 
 
@@ -15,6 +19,14 @@ def get_questions():
     We have two different kind of questions: questions
     with a likert scale and questions with predefined
     categories.
+
+    Each question has a tag, stating if it was used for
+    the first, second or in both behavioral analyses.
+    If anything was changed in a question, a second
+    question object has been created and added to the
+    array.
+
+    :return: array of dictionaries
     """
     questions = []
 
