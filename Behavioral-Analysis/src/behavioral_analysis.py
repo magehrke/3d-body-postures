@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
-from scipy.stats import norm, shapiro
+from scipy.stats import norm, shapiro, normaltest, chi2, kurtosis, skew, ttest_1samp
 from tqdm import tqdm
 import os
 import pickle
@@ -118,6 +118,20 @@ class BehavioralAnalysis:
         else:
             return "3,67-5,00"
 
+    @staticmethod
+    def grouping_folder_names_2(likert_mean):
+        """
+        Split in 4 groups of same size
+        """
+        if likert_mean <= 2:
+            return "1,00-2,00"
+        elif likert_mean <= 3:
+            return "2,01-3,00"
+        elif likert_mean <= 4:
+            return "3,01-4,00"
+        else:
+            return "4,01-5,00"
+
     def create_boxplots(self, question: dict, sum_viewpoints=False, only_hist=False):
         """
         TODO
@@ -197,16 +211,11 @@ class BehavioralAnalysis:
             scatter_data = np.transpose(scatter_data)
             float_value_arr = np.array(scatter_data[1], dtype=np.float)
 
-            # Descriptive statistics and tests
-            print(f'------------------------------')
-            print(f'Descriptives {question["prefix"]} (ba_num={ba_num}, sum_vps={sum_viewpoints})')
-            mu, std = norm.fit(float_value_arr)
-            print(shapiro(float_value_arr))
-            print(f'------------------------------')
-
+            mu = np.mean(float_value_arr)
+            std = np.std(float_value_arr)
 
             # Plot histogram of the posture means (incl. normal)
-            plt.hist(float_value_arr, bins=15, density=False, label=f'mu = {round(mu, 2)}, std = {round(std, 2)}')
+            n_bins, bins, _ = plt.hist(float_value_arr, bins=15, density=True, label=f'mu = {round(mu, 2)}, std = {round(std, 2)}')
             plt.ylabel('Number of stimuli')
             plt.xlabel(f'{question["likert_str_min"]}     =>     '
                        f'{question["likert_str_max"]}')
@@ -217,13 +226,41 @@ class BehavioralAnalysis:
             xmin, xmax = plt.xlim()
             x = np.linspace(xmin, xmax, 100)
             p = norm.pdf(x, mu, std)
-            plt.plot(x, p, 'k', linewidth=2)
+            # plt.plot(x, p, 'k', linewidth=2)
             plt.legend()
             save_path = f'{save_dir}/{question["prefix"]}_hist_all_vps'
             if sum_viewpoints:
                 save_path = f'{save_dir}/{question["prefix"]}_hist_vp_avg'
             plt.savefig(save_path, dpi=self.dpi, bbox_inches='tight')
             plt.close()
+
+            # Descriptive statistics and tests
+            print(f'------------------------------')
+            print(f'Descriptives {question["prefix"]} (ba_num={ba_num}, sum_vps={sum_viewpoints})')
+            n_bin_max = np.argmax(n_bins)
+            bin_median_1 = round(bins[n_bin_max], 2)
+            bin_median_2 = round(bins[n_bin_max+1], 2)
+            print(f'bin median = [{bin_median_1}, {bin_median_2}]')
+            kurt_x = kurtosis(float_value_arr)
+            skew_x = skew(float_value_arr)
+            _, shapiro_p = shapiro(float_value_arr)
+            print(f'mu = {round(mu, 2)}, std = {round(std, 2)}')
+            print(f'kurt = {round(kurt_x, 2)}, skew = {round(skew_x, 2)}')
+            print(f'Shapiro p: {round(shapiro_p, 3)}')
+
+            def var_test(x, va0, direction="lower", alpha=0.05):
+                n = len(x)
+                Q = (n - 1) * np.var(x) / va0
+                if direction == "lower":
+                    q = chi2.ppf(alpha, n - 1)
+                    if Q <= q:
+                        print("Var test: equal or lower")
+                    else:
+                        print("Var test: greater :(")
+            var_test(float_value_arr, 0.44)  # 68.2% shall be between in a range of 1.33
+            _, ttest_p = ttest_1samp(float_value_arr, 3)
+            print(f'T-Test p: {ttest_p}')
+            print(f'------------------------------')
 
             # Print & export overview of values
             if sum_viewpoints:
@@ -236,6 +273,7 @@ class BehavioralAnalysis:
                            f'({question["likert_max"]})\n\n')
             last_group = BehavioralAnalysis.grouping_folder_names(float(scatter_data[1][0]))
             groups_in_total = []
+            groups_in_total_2 = []
             for i in range(len(scatter_data[0])):
                 if sum_viewpoints:
                     out_str = f'{format(scatter_data[0][i] + " (" + self.scale[scatter_data[1][i]] + "),", " <30")}'
@@ -246,14 +284,24 @@ class BehavioralAnalysis:
                 out_file.write(out_str)
                 curr_group = BehavioralAnalysis.grouping_folder_names(float(scatter_data[1][i]))
                 groups_in_total.append(curr_group)
+                groups_in_total_2.append(BehavioralAnalysis.grouping_folder_names_2(float(scatter_data[1][i])))
                 if last_group is not curr_group:
                     out_file.write('\n')
                     last_group = curr_group
+            # Summary with 3 groups
+            n_stim = len(groups_in_total)
             count = Counter(groups_in_total)
             out_file.write(f'\nNumber of stimuli in groups:')
             for k, v in count.items():
-                out_file.write(f'\n{k}: {v}')
+                out_file.write(f'\n{k}: {v} ({round(v/n_stim*100, 2)}%)')
+            # Summary with 4 groups
+            out_file.write('\n')
+            count = Counter(groups_in_total_2)
+            out_file.write(f'\nNumber of stimuli in groups:')
+            for k, v in count.items():
+                out_file.write(f'\n{k}: {v} ({round(v/n_stim*100, 2)}%)')
             out_file.close()
+
 
     def barplot(self, question: dict, sum_viewpoints=False, hist_only=False):
         for ba_num in self.get_loops(question):
@@ -323,13 +371,15 @@ class BehavioralAnalysis:
             hist_count = Counter(hist_data)
             keys = (hist_count.keys())
             values = list(hist_count.values())
+            n_ans = np.sum(values)
+            val_perc = values / n_ans * 100
             # - Add labels on top of bars
             bars = range(0, len(values)+1)
             plt.bar(keys, values)
             plt.xticks(rotation=45)
             plt.ylabel("Number of stimuli")
             for i in range(len(values)):
-                plt.annotate(str(values[i]), xy=(bars[i], values[i]), ha='center', va='bottom')
+                plt.annotate(f'{values[i]} ({round(val_perc[i], 1)}%)', xy=(bars[i], values[i]), ha='center', va='bottom')
             suffix = 'vp-avg' if sum_viewpoints else 'all-vps'
             plt.savefig(f'{save_dir}/{question["prefix"]}_bar_{suffix}',
                         dpi=self.dpi, bbox_inches='tight')

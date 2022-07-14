@@ -22,7 +22,7 @@ from calculate_statistics import calculate_statistics
     executed once before running any analysis.
 """
 
-ba = BehavioralAnalysis(ba_numbers=['1'])
+ba = BehavioralAnalysis(ba_numbers=['all'])
 
 # Get all questions that have been used in any behavioral analyses
 questions = get_questions()
@@ -38,9 +38,9 @@ calculate_statistics(questions, force=False)
 for q in questions:
     # Barplots only for questions that had categories to choose from
     if 'categories' in q:
-        #ba.barplot(question=q, sum_viewpoints=False, hist_only=True)
-        pass
+        ba.barplot(question=q, sum_viewpoints=False, hist_only=True)
+        #pass
     # all others are likert-scale questions where we can create boxplots
     else:
-        ba.create_boxplots(question=q, sum_viewpoints=False, only_hist=True)
-        #pass
+        #ba.create_boxplots(question=q, sum_viewpoints=False, only_hist=True)
+        pass
