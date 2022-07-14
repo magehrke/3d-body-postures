@@ -3,133 +3,32 @@ import pandas as pd
 import os
 import pickle
 from tqdm import tqdm
+import utils
 
 
 def calculate_statistics(questions: [dict], force: bool = False) -> None:
     print(f'--- CALCULATING STATISTICS ---')
     # --- BEHAVIORAL ANALYSIS 1 ---
 
-    uparam_dict_1 = get_uparams_ba_1()
-    uparam_dict_2 = get_uparams_ba_2()
+    uparam_dict_1 = utils.get_uparams_ba_1()
+    uparam_dict_2 = utils.get_uparams_ba_2()
 
     calculate_stats_per_question(questions, uparam_dict_1, uparam_dict_2, force)
 
 
-def get_uparams_ba_1():
-    # Get data
-    df = pd.read_csv(f'../input/behavioral_analysis_1/Questionnaire.csv')
-    print(f'BA1 Original DF shape: {df.shape}')
-
-    # Drop columns
-    drop_names_starting_with = ['Timing', 'Rest time']
-    for n in drop_names_starting_with:
-        vec = df.iloc[0, :].str.contains(n)
-        df.drop(columns=df.loc[:, vec].columns.values, inplace=True)
-
-    # Drop unfinished observations
-    df = df[df['Finished'] != '0']
-    print(f'BA1 DF shape after dropping: {df.shape}')
-    print(f'BA1 Number of Subjects: {df.shape[0] - 2}')
-    c_names = df.columns.values
-
-    # Load file containing which question belongs to which pose
-    p_items_lst = np.load('../input/behavioral_analysis_1/item-question-association.npy', allow_pickle=True).item()
-    p_items_lst = dict(p_items_lst)
-    assert len(p_items_lst.keys()) == 324
-
-    # Extract uparam names (108 names with 3 viewpoints each)
-    uparam_names = [x[:x.find('Viewpoint') - 1] for x in
-                    p_items_lst.keys()]
-    uparam_names = set(uparam_names)
-    assert len(uparam_names) == 108
-
-    # Extract only those items that are in the df
-    # This should result in 10 questions per item
-    # Create a dictionary that contains the columns
-    # of the df that belong to the stimulus.
-    # Save the questions in a double dictionary
-    # dict[uparam_name][full_name_per_viewpoint]
-    uparam_dict = {}
-    for sn in uparam_names:
-        viewpoint_dict = {}
-        for pose_name in p_items_lst.keys():
-            if pose_name.startswith(f'{sn}_'):
-                lst = []
-                it = p_items_lst[pose_name]
-                for i in it:
-                    if i in c_names:
-                        lst.append(i)
-                    elif f'{i}_1' in c_names:
-                        lst.append(f'{i}_1')
-                assert len(lst) == 10
-                viewpoint_dict[pose_name] = df[lst]
-        uparam_dict[sn] = viewpoint_dict
-    return uparam_dict
-
-
-def get_uparams_ba_2():
-    # Get data
-    df = pd.read_csv(f'../input/behavioral_analysis_2/Questionnaire.csv')
-    print(f'BA2 Original DF shape: {df.shape}')
-
-    # Drop columns
-    drop_names_starting_with = ['Timing', 'Rest time']
-    for n in drop_names_starting_with:
-        vec = df.iloc[0, :].str.contains(n)
-        df.drop(columns=df.loc[:, vec].columns.values, inplace=True)
-
-    # Drop unfinished observations
-    df = df[df['Finished'] != '0']
-    print(f'BA2 DF shape after dropping: {df.shape}')
-    print(f'BA2 Number of Subjects: {df.shape[0] - 2}')
-    c_names = df.columns.values
-
-    # Load file containing which question belongs to which pose
-    pose_url_df = pd.read_csv('../input/behavioral_analysis_2/im_url_to_pose_stim.csv')
-    assert len(pose_url_df) == 324
-    assert pose_url_df['pose_name'].nunique() == 324
-    assert pose_url_df['url'].nunique() == 324
-
-    # Extract uparam names (108 names with 3 viewpoints each)
-    uparam_names = [x[:x.find('Viewpoint') - 1] for x in pose_url_df['pose_name']]
-    uparam_names = set(uparam_names)
-    assert len(uparam_names) == 108
-
-    # Extract only those items that are in the df
-    # This should result in 6 questions per item
-    # Save the questions in a double dictionary
-    # dict[uparam_name][full_name_per_viewpoint]
-    uparam_dict = {}
-    for un in uparam_names:
-        viewpoint_dict = {}
-        for index, row in pose_url_df.iterrows():
-            pose_name = row['pose_name']
-            im_url = row['url']
-            if pose_name.startswith(f'{un}_'):
-                sel_cols = []
-                # Iterate over the data and find the questions that have
-                # been answered after seeing the specific stimuli.
-                for i, col in enumerate(df.iloc[0]):
-                    if im_url in col:
-                        sel_cols.append(c_names[i])
-                assert len(sel_cols) == 6
-                viewpoint_dict[pose_name] = df[sel_cols]
-        uparam_dict[un] = viewpoint_dict
-    return uparam_dict
-
-
-def calculate_stats_per_question(questions: [dict], uparam_dict_1, uparam_dict_2, force) -> dict:
+def calculate_stats_per_question(questions: [dict], uparam_dict_1, uparam_dict_2, force) -> None:
     """
-    Load or calculate the statistics (mean, median, std, n or raw data values) for a question
-    for each pose over all participants. Viewpoints of the same pose are stored together under
-    their respective 'uparam' name.
+    Calculate statistics of the behavioral analysis(mean, median, std, n and raw data values)
+    for a question for each pose over all participants. Viewpoints of the same pose are stored
+    together under their respective 'uparam' name.
 
     We differentiate between a likert and a categorical question type, where the latter
     had several answers to choose from.
 
     :param questions: dictionary containing the information of a question
-    :param force: if this variable is true, we do a new calculation and overwrite old stats on disk
-    :return: dictionary with the uparam name as key and a dictionary, containing statistics, as value
+    :param uparam_dict_1: dictionary storing the raw answers for each stimulus/uparam for analysis 1
+    :param uparam_dict_2: dictionary storing the raw answers for each stimulus/uparam for analysis 2
+    :param force: if true, statistics are recalculated, even if they are already available on disk
     """
     if not os.path.exists(f'../output/behavioral_analysis_1/stat_dicts/'):
         os.makedirs(f'../output/behavioral_analysis_1/stat_dicts/')
