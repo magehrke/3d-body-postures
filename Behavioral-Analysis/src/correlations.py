@@ -55,7 +55,7 @@ pear = scipy.stats.pearsonr(poss_avg_data, real_avg_data)
 # Plot a line
 b, m = polyfit(poss_avg_data, real_avg_data, 1)
 plt.plot(poss_avg_data, b + m * poss_avg_data, '-', c='tab:orange',
-         label=f'r = {round(pear[0], 2)}, p = {round(pear[1], 4)}')
+         label=f'r = {round(pear[0], 2)}')
 # Plot data
 plt.plot(poss_avg_data, real_avg_data, '+', c='tab:blue')
 # Plot text & save
@@ -70,7 +70,7 @@ pear = scipy.stats.pearsonr(move_avg_data, real_avg_data)
 # plot a line
 b, m = polyfit(move_avg_data, real_avg_data, 1)
 plt.plot(move_avg_data, b + m * move_avg_data, '-', c='tab:orange',
-         label=f'r = {round(pear[0], 2)}, p = {round(pear[1], 4)}')
+         label=f'r = {round(pear[0], 2)}')
 # plot data
 plt.plot(move_avg_data, real_avg_data, '+', c='tab:blue')
 # plot text & save
@@ -81,12 +81,12 @@ plt.savefig(out_dir + f'corr_move_realism_all_vps.png', dpi=200, bbox_inches='ti
 plt.close()
 
 
-# 2d plot: realism & possiblity
+# 2d plot: poss & move
 pear = scipy.stats.pearsonr(poss_avg_data, move_avg_data)
 # plot a line
 b, m = polyfit(poss_avg_data, move_avg_data, 1)
 plt.plot(poss_avg_data, b + m * poss_avg_data, '-', c='tab:orange',
-         label=f'r = {round(pear[0], 2)}, p = {round(pear[1], 4)}')
+         label=f'r = {round(pear[0], 2)}')
 # plot data
 plt.plot(poss_avg_data, move_avg_data, '+', c='tab:blue')
 # plot text & save

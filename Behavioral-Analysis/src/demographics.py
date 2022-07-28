@@ -9,7 +9,7 @@ from datetime import datetime
     Author: MA Gehrke
     Date: 05.07.2022
 
-    Calculate the statics of the behavioral 
+    Calculate the demographics of the behavioral 
     analysis and print it to the console.
 """
 

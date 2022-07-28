@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
-from scipy.stats import norm, shapiro, normaltest, chi2, kurtosis, skew, ttest_1samp
+from scipy.stats import norm, shapiro, normaltest, chi2, kurtosis, skew, ttest_1samp, skewtest, kurtosistest
 from tqdm import tqdm
 import os
 import pickle
@@ -80,28 +80,6 @@ class BehavioralAnalysis:
                 stats = pickle.load(input_file)
                 return stats
 
-    # # Not used
-    # def create_boxplots_vp(self, desc: dict, stats: dict):
-    #     loop_desc = f'Creating {desc["prefix"]} boxplots'
-    #     save_dir = f'boxplots-vp/{desc["prefix"]}'
-    #     if not os.path.exists(save_dir):
-    #         os.mkdir(save_dir)
-    #     for uparam, dfs_of_vps in tqdm(stats.items(), loop_desc):
-    #         y_labels = []
-    #         for i, (pose_name, vp_dict) in enumerate(dfs_of_vps.items()):
-    #             plt.boxplot(vp_dict['raw'], positions=[i+1])
-    #             y_labels.append(f'{i+1} (n={vp_dict["n"]})')
-    #         plt.title(f'{uparam} (Scale = {self.scale[uparam]})')
-    #         plt.ylim((desc['likert_min'] - 1, desc['likert_max'] + 1))
-    #         plt.yticks(range(desc['likert_min'], desc['likert_max'] + 1),
-    #                    range(desc['likert_min'],  desc['likert_max'] + 1))
-    #         plt.xticks(range(1, 4), y_labels)
-    #         plt.xlabel('Viewpoint')
-    #         plt.ylabel('Likert Scale')
-    #         plt.savefig(f'{save_dir}/{uparam}_scale_{self.scale[uparam]}',
-    #                     dpi=self.dpi, bbox_inches='tight')
-    #         plt.close()
-
     @staticmethod
     def grouping_folder_names(likert_mean):
         """
@@ -132,7 +110,7 @@ class BehavioralAnalysis:
         else:
             return "4,01-5,00"
 
-    def create_boxplots(self, question: dict, sum_viewpoints=False, only_hist=False):
+    def create_boxplots_histograms(self, question: dict, sum_viewpoints=False, only_hist=False):
         """
         TODO
         """
@@ -215,13 +193,15 @@ class BehavioralAnalysis:
             std = np.std(float_value_arr)
 
             # Plot histogram of the posture means (incl. normal)
-            n_bins, bins, _ = plt.hist(float_value_arr, bins=15, density=True, label=f'mu = {round(mu, 2)}, std = {round(std, 2)}')
+            n_bins, bins, _ = plt.hist(float_value_arr, bins=15, density=False)
+            plt.axvline(np.mean(float_value_arr), color='k', linestyle='dashed', linewidth=1, label=f'Mean = {round(mu, 2)} (SD = {round(std, 2)})')  # Mean
             plt.ylabel('Number of stimuli')
             plt.xlabel(f'{question["likert_str_min"]}     =>     '
                        f'{question["likert_str_max"]}')
             plt.xlim((question['likert_min'] - 1, question['likert_max'] + 1))
             plt.xticks(range(question['likert_min'], question['likert_max'] + 1),
                        range(question['likert_min'], question['likert_max'] + 1))
+
             # Plot normal distribution
             xmin, xmax = plt.xlim()
             x = np.linspace(xmin, xmax, 100)
@@ -243,9 +223,13 @@ class BehavioralAnalysis:
             print(f'bin median = [{bin_median_1}, {bin_median_2}]')
             kurt_x = kurtosis(float_value_arr)
             skew_x = skew(float_value_arr)
+            skew_t = skewtest(float_value_arr)
+            kurt_t = kurtosistest(float_value_arr)
             _, shapiro_p = shapiro(float_value_arr)
             print(f'mu = {round(mu, 2)}, std = {round(std, 2)}')
             print(f'kurt = {round(kurt_x, 2)}, skew = {round(skew_x, 2)}')
+            print(f'Skewtest = {skew_t}')
+            print(f'Kurtosistest = {kurt_t}')
             print(f'Shapiro p: {round(shapiro_p, 3)}')
 
             def var_test(x, va0, direction="lower", alpha=0.05):
@@ -315,6 +299,7 @@ class BehavioralAnalysis:
 
             hist_data = []
             loop_desc = f'Creating {question["prefix"]} barplots (BA {ba_num})'
+            consensus_values = []
             for uparam, dfs_of_vps in tqdm(stats.items(), loop_desc):
                 hist_uparam = []
                 if sum_viewpoints:
@@ -325,6 +310,7 @@ class BehavioralAnalysis:
                 else:
                     for i, (pose_name, vp_dict) in enumerate(dfs_of_vps.items()):
                         hist_uparam.append([pose_name, vp_dict['raw']])
+
                 for pose_name, hu in hist_uparam:
                     count = Counter(hu)
                     names = list(question['categories'].values())
@@ -335,6 +321,7 @@ class BehavioralAnalysis:
                         values[ind] = v
                     max_ind = int(np.argmax(values))
                     max_name = names[max_ind]
+                    consensus_values.append([pose_name, sorted(values), max_name])
                     hist_data.append(max_name)
                     if not hist_only:
                         fig, ax = plt.subplots(1, 2, gridspec_kw={'width_ratios': [2, 1]})
@@ -369,7 +356,7 @@ class BehavioralAnalysis:
 
             # Histogram of max categories
             hist_count = Counter(hist_data)
-            keys = (hist_count.keys())
+            keys = list(hist_count.keys())
             values = list(hist_count.values())
             n_ans = np.sum(values)
             val_perc = values / n_ans * 100
@@ -382,6 +369,62 @@ class BehavioralAnalysis:
                 plt.annotate(f'{values[i]} ({round(val_perc[i], 1)}%)', xy=(bars[i], values[i]), ha='center', va='bottom')
             suffix = 'vp-avg' if sum_viewpoints else 'all-vps'
             plt.savefig(f'{save_dir}/{question["prefix"]}_bar_{suffix}',
+                        dpi=self.dpi, bbox_inches='tight')
+            plt.close()
+
+            # ----- CONSENSUS ----- #
+            # Plot consensus (how much percent ansered max category
+            # Sort consensus by the intervals that got most answers
+            sorted_values_list = []
+            for i in range(len(keys)):
+                name_of_max_category = keys[i]
+                for j in range(len(consensus_values)):
+                    if consensus_values[j][2] == name_of_max_category:
+                        sorted_values_list.append(consensus_values[j])
+            assert len(consensus_values) == 324
+            # Get only the values
+            cons_only_values = list(zip(*sorted_values_list))[1]
+            # Turn into percentages
+            cons_perc_only_max = []
+            for v in cons_only_values:
+                perc = max(v) / sum(v)
+                perc = perc * 100
+                perc = round(perc)
+                cons_perc_only_max.append(perc)
+            # PLOTTING
+            fig, ax1 = plt.subplots(1, 1)
+            ax1.scatter(range(1, 325), cons_perc_only_max, marker="x", alpha=0.7)
+            # ax1.bar(range(1, 325), cons_perc_only_max)
+            mu = round(np.median(cons_perc_only_max), 2)
+            print(f'Consensus for {question["prefix"]} = {mu}')
+            ax1.axhline(mu, linestyle='dashed', color='k', label=f'All stimuli')
+
+            mycolors = ['orange', 'blue', 'red', 'tab:brown', 'pink']
+            # Plot horizontal lines
+            start_ind = 0
+            for i in range(len(values)):
+                med = np.median(cons_perc_only_max[start_ind:start_ind+values[i]])
+                ax1.hlines(y=med, xmin=start_ind, xmax=start_ind+values[i], linewidth=2, color=mycolors[i], label=f'{keys[i]}')
+                start_ind += values[i]
+
+            # Plot stacked bar plot
+            # lefts = 0
+            # for i in range(len(values)):
+            #     v = values[i]
+            #     if i == 0:
+            #         ax1.barh(-6, v, height=10, label=f'{keys[i]}')
+            #         lefts = v
+            #     else:
+            #         ax1.barh(-6, v, left=lefts, height=10, label=f'{keys[i]}')
+            #         lefts += v
+
+            leg = ax1.legend(loc='upper left', ncol=2, title="$\\bf{Median}:$")
+            leg._legend_box.align = "left"
+            plt.ylabel('Percentage')
+            plt.xlabel('Stimulus')
+            yb, yt = ax1.get_ylim()
+            ax1.set_ylim(yb, yt + 20)
+            plt.savefig(f'{save_dir}/{question["prefix"]}_consensus_max_category_{suffix}',
                         dpi=self.dpi, bbox_inches='tight')
             plt.close()
 
