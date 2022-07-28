@@ -404,26 +404,31 @@ class BehavioralAnalysis:
             start_ind = 0
             for i in range(len(values)):
                 med = np.median(cons_perc_only_max[start_ind:start_ind+values[i]])
-                ax1.hlines(y=med, xmin=start_ind, xmax=start_ind+values[i], linewidth=2, color=mycolors[i], label=f'{keys[i]}')
+                ax1.hlines(y=med, xmin=start_ind, xmax=start_ind+values[i], linewidth=2, color=mycolors[i])
                 start_ind += values[i]
 
             # Plot stacked bar plot
-            # lefts = 0
-            # for i in range(len(values)):
-            #     v = values[i]
-            #     if i == 0:
-            #         ax1.barh(-6, v, height=10, label=f'{keys[i]}')
-            #         lefts = v
-            #     else:
-            #         ax1.barh(-6, v, left=lefts, height=10, label=f'{keys[i]}')
-            #         lefts += v
+            lefts = 0
+            for i in range(len(values)):
+                v = values[i]
+                if i == 0:
+                    ax1.barh(10, v, height=10, label=f'{keys[i]}', color=mycolors[i])
+                    lefts = v
+                else:
+                    ax1.barh(10, v, left=lefts, height=10, label=f'{keys[i]}', color=mycolors[i])
+                    lefts += v
 
-            leg = ax1.legend(loc='upper left', ncol=2, title="$\\bf{Median}:$")
+            my_ncol = 4
+            my_yheight = 20
+            if question["prefix"] == "dailyaction":
+                my_ncol = 3
+                my_yheight = 30
+            leg = ax1.legend(loc='upper left', ncol=my_ncol, mode="expand", title="$\\bf{Median}:$")
             leg._legend_box.align = "left"
             plt.ylabel('Percentage')
             plt.xlabel('Stimulus')
             yb, yt = ax1.get_ylim()
-            ax1.set_ylim(yb, yt + 20)
+            ax1.set_ylim(yb, yt + my_yheight)
             plt.savefig(f'{save_dir}/{question["prefix"]}_consensus_max_category_{suffix}',
                         dpi=self.dpi, bbox_inches='tight')
             plt.close()
