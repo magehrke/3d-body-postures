@@ -22,7 +22,7 @@ for 750ms or so, but expert for as long as they wanted.
 vp_dict = {-45: 1, 0: 2, 45: 3}
 
 # Import stimuli and associated features
-stimuli = scipy.io.loadmat('../data/all_params_enc_mod_12_runs.mat')['stim']
+stimuli = scipy.io.loadmat('~/data/all_params_enc_mod_12_runs.mat')['stim']
 uparam, viewpoint, scale, kp2d, latent32d = [], [], [], [], []
 for i in range(6):
     info_struct = stimuli[0][1]['run'][0][0]['info']
@@ -43,7 +43,7 @@ latent32d = np.squeeze(np.array(latent32d))
 # 2cat: the cutoff for possibility and realism is exactly at 3 (= 2 categories per feature)
 # Higher is possible/real, lower is impossible/unreal
 # Group_index: 0 = both high, 1 = p high & r low, 2 = p low & r high, 3 = both low
-pd2cat = pd.read_csv(f'../data/grouping_poss_real_2categories.csv', sep=',')
+pd2cat = pd.read_csv(f'../input/possibility_check/grouping_poss_real_2categories.csv', sep=',')
 
 # BA: Select stimuli that are high or low on POSSIBILITY
 poss2cat = np.array(pd2cat[pd2cat['group_index'] < 2]['uparam'])
@@ -53,7 +53,7 @@ print(f'Stimuli that are > 3 in possiblity (high): {len(poss2cat)}')
 print(f'Stimuli that are < 3 in possiblity (low): {len(imposs2cat)}\n')
 
 # Import expert categorization
-pd_expert = pd.read_csv(f'../data/possibility_by_expert.csv')
+pd_expert = pd.read_csv(f'../data/possibility_check/possibility_by_expert.csv')
 
 # Expert: Select stimuli that are high or low on POSSIBILITY
 poss_ex = np.array(pd_expert[pd_expert['possible_2d'] == 1][['uparam', 'viewpoint']])

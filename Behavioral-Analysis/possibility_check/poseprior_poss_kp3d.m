@@ -7,12 +7,12 @@ calc_ba2_matching = true;
 calc_ba_third_matching = true;
 
 % Go to the parentfolder (called "Check-Possibility" atm)
-cd('/home/magehrke/Github/3D Body Postures/Check-Possiblity/');
+cd('/home/magehrke/Github/3D Body Postures/Behavioral-Analysis/');
 % We add the paths to the scripts here
-addpath("src");
+addpath("possibility_check");
 addpath("poseprior");
 
-mat = load('data/all_params_enc_mod_12_runs.mat');
+mat = load('~/data/all_params_enc_mod_12_runs.mat');
 stim = mat.stim;
 
 % ------------------------------------------------------------------- %
@@ -137,17 +137,17 @@ if calc_poseprior_possibility
     fprintf("%i imposs poses cannot be adjusted.\n\n", size(imposs_not_adjustable, 1));
     % -------- -------- -------- -------- -------- -------- -------- %
     % Visualisation: move possible/impossible stimuli to new folders
-    if ~exist("data/poseprior/", 'dir')
-        mkdir data poseprior;
+    if ~exist("../output/poseprior/", 'dir')
+        mkdir output poseprior;
     end
-    if ~exist("data/poseprior/possible/", 'dir')
-        mkdir data/poseprior possible;
+    if ~exist("../output/poseprior/possible/", 'dir')
+        mkdir ../output/poseprior possible;
     end
-    delete("data/poseprior/possible/*");
-    if ~exist("data/poseprior/impossible/", 'dir')
-        mkdir data/poseprior impossible;
+    delete("../output/poseprior/possible/*");
+    if ~exist("../output/poseprior/impossible/", 'dir')
+        mkdir ../output/poseprior impossible;
     end
-    delete("data/poseprior/impossible/*");
+    delete("..output/poseprior/impossible/*");
     
     for i=1:length(param_view)
         % Create stimuli file name
@@ -158,11 +158,11 @@ if calc_poseprior_possibility
             vp_map(viewpoint) + "_scale_" + scale + ".png";
         % Move stimuli to possible/impossible folder
         if poss_bool(i, 1) == 1
-            dst_folder = "data/poseprior/possible/";
-            copyfile("data/Stim_images/" + stim_file_name, dst_folder);
+            dst_folder = "../output/poseprior/possible/";
+            copyfile("../input/stim_images/" + stim_file_name, dst_folder);
         else % must be impossible then
-            dst_folder = "data/poseprior/impossible/";
-            im = imread('data/Stim_images/' + stim_file_name);
+            dst_folder = "../output/poseprior/impossible/";
+            im = imread('../input/stim_images/' + stim_file_name);
             inv_bool = ~poss_array(i,:);
             txt = edges_str_lst(inv_bool);
             txt = strjoin(txt, '\n');
@@ -213,7 +213,7 @@ poseprior_plot_joints('3d', joints_lst{rs}, ...
 % ------------------------------------------------------------------- %
 % Compare what we have found with expert choices of possibility
 if calc_expert_matching
-    expert_tbl = readtable("data/possibility_by_expert.csv"); 
+    expert_tbl = readtable("../input/possibility_check/possibility_by_expert.csv"); 
     
     divergence_diff_ctr = 0;
     matching_poses_ctr = 0;
@@ -252,7 +252,7 @@ end
 
 
 if calc_ba2_matching
-    ba2_tbl = readtable("data/grouping_poss_real_2categories.csv", 'Delimiter', ',');
+    ba2_tbl = readtable("../input/possibility_check/grouping_poss_real_2categories.csv", 'Delimiter', ',');
     idx = ba2_tbl.group_index < 2;
     ba2_poss_uparams = ba2_tbl{idx, "uparam"};
     idx = ba2_tbl.group_index > 1;
@@ -287,7 +287,7 @@ if calc_ba2_matching
 end
 
 if calc_ba_third_matching
-    ba3_tbl = readtable("data/grouping_poss_real_3categories.csv", 'Delimiter', ',');
+    ba3_tbl = readtable("../input/possibility_check/grouping_poss_real_3categories.csv", 'Delimiter', ',');
     idx = ba3_tbl.group_index == 0;
     ba3_poss_uparams = ba3_tbl{idx, "uparam"};
     idx = ba3_tbl.group_index == 3;
